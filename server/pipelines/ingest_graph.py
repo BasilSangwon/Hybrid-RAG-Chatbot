@@ -62,6 +62,8 @@ def run_graph_ingest(model_name: str, experiment_id: int, chunk_size: int = 2000
         "Feature",      # 기능 (실시간 통역)
         "Spec",         # 스펙 (4000mAh)
         "Requirement",  # 필요조건 (네트워크, 계정)
+        "Constraint",   # [추가] '제약조건'을 명시적으로 추가
+        "Condition",    # [추가] '조건' 추가
         "Component",    # 구성요소 (카메라, 배터리)
         "UserManual",   # 매뉴얼 문서
         "Section"       # 매뉴얼 섹션
@@ -71,6 +73,8 @@ def run_graph_ingest(model_name: str, experiment_id: int, chunk_size: int = 2000
         "HAS_FEATURE",      # 제품 -> 기능
         "HAS_SPEC",         # 제품 -> 스펙
         "REQUIRES",         # 기능 -> 조건 (네트워크 등)
+        "HAS_CONSTRAINT",   # [추가] 기능 -> 제약조건
+        "HAS_CONDITION",    # [추가] 기능 -> 조건
         "INCLUDES",         # 포함 관계
         "PART_OF",          # 구성 관계
         "RELATED_TO",       # 일반적인 관련성
@@ -83,6 +87,7 @@ def run_graph_ingest(model_name: str, experiment_id: int, chunk_size: int = 2000
         allowed_nodes=allowed_nodes,
         allowed_relationships=allowed_rels,
         # node_properties=["id"] # id 속성은 기본적으로 생성됨
+        node_properties=["id", "description"]
     )
     # ---------------------------------------------------------
 
@@ -138,7 +143,7 @@ def run_graph_ingest(model_name: str, experiment_id: int, chunk_size: int = 2000
                 # (3) DB 저장
                 graph.add_graph_documents(graph_docs)
                 print(f"      📦 Batch {i//BATCH_SIZE + 1} saved.")
-                time.sleep(1) # 휴식 (Rate Limit 방지)
+                time.sleep(21) # 휴식 (Rate Limit 방지)
                 
             except Exception as e:
                 print(f"      ⚠️ Error in batch {i}: {e}")

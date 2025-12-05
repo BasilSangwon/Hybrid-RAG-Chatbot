@@ -561,21 +561,17 @@ async def chat_endpoint(req: ChatReq, db: Session = Depends(get_db)):
     async def gen():
         try:
             # [NEW] 동적 Vector Store 연결 (가장 최근 실험 찾기)
-            # 기본값은 설정 파일의 manual_docs
             current_vector_store = vector_store 
             
-            # 가장 최근의 'vector' 타입 실험을 조회
             latest_exp = db.query(Experiment).filter(Experiment.rag_type == "vector").order_by(Experiment.created_at.desc()).first()
             
             if latest_exp and latest_exp.collection_name:
-                # 최근 실험이 있으면 그 컬렉션으로 갈아끼움
                 current_vector_store = PGVector(
                     embeddings=embeddings,
                     collection_name=latest_exp.collection_name,
                     connection=DB_CONNECTION,
                     use_jsonb=True,
                 )
-                # Debug: 연결된 컬렉션 이름 출력 (로그 확인용)
                 print(f"🔎 Searching in Collection: {latest_exp.collection_name}")
 
             # 2. 정답 캐시 확인
@@ -592,9 +588,8 @@ async def chat_endpoint(req: ChatReq, db: Session = Depends(get_db)):
             vector_context = "Not used"
             graph_context = "Not used"
             
-            # 3. Vector Search (이제 올바른 방에서 찾음!)
+            # 3. Vector Search
             if req.rag_type in ["hybrid", "vector"]:
-                # k값도 넉넉하게 10으로 설정
                 docs = current_vector_store.similarity_search(user_query, k=10)
                 if docs:
                     vector_context = "\n".join([d.page_content[:500] for d in docs])
@@ -603,16 +598,13 @@ async def chat_endpoint(req: ChatReq, db: Session = Depends(get_db)):
 
             # 3. Graph Search
             if req.rag_type in ["hybrid", "graph"] and graph:
-                yield "🔍 Analyzing Knowledge Graph...\\n\\n"
+                # [수정 1] "Analyzing Knowledge Graph..." 메시지 전송 코드 삭제함
+                # yield "🔍 Analyzing Knowledge Graph...\\n\\n" 
+                
                 try:
-                   # [Dynamic Filtering Logic]
-                    # 섞어 쓰기를 위해 필터링 조건을 비워둡니다. (모든 모델 데이터 검색)
+                    # [Dynamic Filtering Logic]
                     filter_condition = "" 
                     
-                    # 만약 나중에 프론트에서 'graph_source'를 보내준다면 아래 주석을 푸세요.
-                    # if hasattr(req, 'graph_source') and req.graph_source and req.graph_source != "all":
-                    #     filter_condition = f"AND n.source_model = '{req.graph_source}'"
-
                     CYPHER_GENERATION_TEMPLATE = f"""
                     You are a Neo4j Cypher expert.
                     The user asks a question regarding specific entities and their relationships.
@@ -637,7 +629,7 @@ async def chat_endpoint(req: ChatReq, db: Session = Depends(get_db)):
                     MATCH path = (start)-[*1..3]-(end)
                     RETURN path LIMIT 20
                     UNION
-                    // Strategy 2: Neighbors of keywords (Expanded for Requirements)
+                    // Strategy 2: Neighbors of keywords
                     MATCH path = (n)-[r]-(m)
                     WHERE (toLower(n.id) CONTAINS 'keyword1' OR toLower(n.id) CONTAINS 'keyword2')
                     {filter_condition}
@@ -667,7 +659,6 @@ async def chat_endpoint(req: ChatReq, db: Session = Depends(get_db)):
                         template=CYPHER_GENERATION_TEMPLATE
                     )
 
-                    # 선택된 모델로 Graph QA Chain 생성
                     chain = GraphCypherQAChain.from_llm(
                         llm=chat_llm, 
                         graph=graph, 
@@ -676,7 +667,7 @@ async def chat_endpoint(req: ChatReq, db: Session = Depends(get_db)):
                         cypher_prompt=CYPHER_PROMPT
                     )
                     res = chain.invoke({"query": user_query})
-                    print(f"🔍 Generated Cypher Result: {res}") # [DEBUG]
+                    print(f"🔍 Generated Cypher Result: {res}")
                     graph_context = res.get("result", "No info in graph.")
                 except Exception as e:
                     print(f"Graph Error: {e}")
@@ -695,7 +686,13 @@ async def chat_endpoint(req: ChatReq, db: Session = Depends(get_db)):
             [User Question]
             {user_query}
             
-            Answer the question based on the contexts above.
+            [Instructions for Answering]
+            1. Answer the question specifically based on the provided contexts.
+            2. **Format**: Use **Markdown** to improve readability.
+               - Use **Bold** for key entities or conclusions.
+               - Use bullet points (-) for listing details or evidence.
+            3. If the context does not contain the answer, say you don't know.
+            4. Respond in Korean.
             """
 
             # 5. Generate Stream
@@ -705,18 +702,16 @@ async def chat_endpoint(req: ChatReq, db: Session = Depends(get_db)):
                 yield chunk.content
             
             # 6. Debug Info
-            debug_info = f"\\n\\n---\\n**📊 Debug Info:**\\n- **Model:** {req.model}\\n- **Type:** {req.rag_type}\\n- **Graph:** {graph_context}\\n- **Vector:** {vector_context[:50]}..."
+            # [수정 2] 줄바꿈 문자를 \\n (문자열)에서 \n (실제 줄바꿈)으로 변경
+            debug_info = f"\n\n---\n**📊 Debug Info:**\n- **Model:** {req.model}\n- **Type:** {req.rag_type}\n- **Graph:** {graph_context}\n- **Vector:** {vector_context[:100]}..."
             yield debug_info
 
             # [NEW] Token Usage Tracking
             try:
-                # Estimate tokens (using LLM's tokenizer if available, or simple count)
-                # ChatGoogleGenerativeAI has get_num_tokens
                 input_tokens = chat_llm.get_num_tokens(final_prompt)
                 output_tokens = chat_llm.get_num_tokens(full_response)
                 cost = calculate_cost(req.model, input_tokens, output_tokens)
                 
-                # Save to DB (New Session to avoid async conflict if any)
                 with SessionLocal() as db_log:
                     usage = TokenUsage(
                         session_id=req.session_id,
@@ -727,7 +722,6 @@ async def chat_endpoint(req: ChatReq, db: Session = Depends(get_db)):
                     )
                     db_log.add(usage)
                     db_log.commit()
-                # print(f"💰 Token Usage Logged: {input_tokens}/{output_tokens} (${cost})")
             except Exception as e:
                 print(f"⚠️ Token tracking failed: {e}")
 
