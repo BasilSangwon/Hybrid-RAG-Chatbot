@@ -410,7 +410,7 @@
                     <div style="flex:1; display:none;" id="graph-source-container">
                         <div class="settings-label">Graph Source</div>
                         <select id="graph-source-select" class="config-select">
-                            <option value="all">All Sources</option>
+                            <option>Loading...</option>
                         </select>
                     </div>
                 </div>
@@ -493,26 +493,31 @@
                 } else {
                     throw new Error("No models returned");
                 }
-
-                // 2. Graph Sources (from Stats)
-                const resStats = await fetch(API_URL + '/api/stats');
-                const stats = await resStats.json();
-                const graphDetails = stats.graph_details || [];
-
-                let sourceOptions = `<option value="all">All Sources</option>`;
-                if (graphDetails.length > 0) {
-                    sourceOptions += graphDetails.map(d =>
-                        `<option value="${d.model}">${d.model} (${d.count})</option>`
-                    ).join('');
-                }
-                graphSourceSelect.innerHTML = sourceOptions;
-
             } catch (e) {
-                console.error("Failed to load models/stats", e);
+                console.error("Failed to load models", e);
                 modelSelect.innerHTML = `
                     <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
                     <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
                 `;
+            }
+        }
+
+        async function loadGraphSource() {
+            try {
+                const res = await fetch(API_URL + '/api/stats');
+                const stats = await res.json();
+                const experiments = stats.graph_experiments || [];
+
+                if (experiments.length > 0) {
+                    graphSourceSelect.innerHTML = experiments.map(e =>
+                        `<option value="${e.model}">${e.name}</option>`
+                    ).join('');
+                } else {
+                    graphSourceSelect.innerHTML = `<option value="">No Graph Data</option>`;
+                }
+            } catch (e) {
+                console.error("Failed to load graph sources", e);
+                graphSourceSelect.innerHTML = `<option value="">Error Loading</option>`;
             }
         }
 
@@ -645,6 +650,7 @@
 
         // 초기화 실행
         loadChatModels();
+        loadGraphSource();
         toggleGraphSource();
         setInterval(checkServerAndPersona, 5000);
         checkServerAndPersona();

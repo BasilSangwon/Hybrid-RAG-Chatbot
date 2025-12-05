@@ -601,11 +601,13 @@ async def chat_endpoint(req: ChatReq, db: Session = Depends(get_db)):
             if req.rag_type in ["hybrid", "graph"] and graph:
                 yield "🔍 Analyzing Knowledge Graph...\\n\\n"
                 try:
-                    # [최종 솔루션] 키워드 기반 독립 검색 (연결고리 없어도 다 찾아냄)
-                    # [Dynamic Filtering Logic]
-                    filter_condition = ""
-                    if req.graph_source and req.graph_source != "all":
-                        filter_condition = f"AND n.source_model = '{req.graph_source}'"
+                   # [Dynamic Filtering Logic]
+                    # 섞어 쓰기를 위해 필터링 조건을 비워둡니다. (모든 모델 데이터 검색)
+                    filter_condition = "" 
+                    
+                    # 만약 나중에 프론트에서 'graph_source'를 보내준다면 아래 주석을 푸세요.
+                    # if hasattr(req, 'graph_source') and req.graph_source and req.graph_source != "all":
+                    #     filter_condition = f"AND n.source_model = '{req.graph_source}'"
 
                     CYPHER_GENERATION_TEMPLATE = f"""
                     You are a Neo4j Cypher expert.
