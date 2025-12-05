@@ -135,15 +135,15 @@ async def run_ingest(req: IngestReq, background_tasks: BackgroundTasks, db: Sess
             req.name = f"Vec_C{chunk_size}_O{overlap}_{timestamp}"
             
         elif req.type == "graph":
-            model_full = req.config.get("llm_model", "unknown")
-            # Shorten model name
-            if "gemini-2.0" in model_full: short_model = "Gemini2.0"
-            elif "gemini-1.5" in model_full: short_model = "Gemini1.5"
-            elif "gemini" in model_full: short_model = "Gemini"
-            else: short_model = model_full.split("/")[-1]
+            # [변경된 부분] Graph 실험 이름 생성 규칙 적용
+            # Format: Graph_{ModelName}_c{ChunkSize}_o{Overlap}_{YYMMDD_HHMM}
             
-            chunk_val = req.config.get("chunk_size", 0)
-            req.name = f"Graph_{short_model}_{chunk_val}_{timestamp}" if chunk_val > 0 else f"Graph_{short_model}_{timestamp}"
+            model_name = req.config.get("llm_model", "unknown")
+            chunk_size = req.config.get("chunk_size", 0)
+            # admin.html에서 payload로 chunk_overlap을 보냅니다.
+            overlap = req.config.get("chunk_overlap", req.config.get("overlap", 0))
+            
+            req.name = f"Graph_{model_name}_c{chunk_size}_o{overlap}_{timestamp}"
 
     # Check if name exists
     existing = db.query(Experiment).filter(Experiment.name == req.name).first()
@@ -306,8 +306,12 @@ def get_models():
         models = []
         for m in genai.list_models():
             if 'generateContent' in m.supported_generation_methods:
-                # Remove 'models/' prefix
                 name = m.name.replace("models/", "")
+                
+                # [추가] 'tts'나 'audio'가 포함된 모델은 제외 (텍스트 전용 작업이므로)
+                if "tts" in name.lower() or "audio" in name.lower():
+                    continue
+
                 models.append({
                     "id": name,
                     "display_name": name
