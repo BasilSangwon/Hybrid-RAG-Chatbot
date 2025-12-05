@@ -1,0 +1,38 @@
+version: '3.8'
+services:
+  # 1. Vector DB (PostgreSQL) - 포트 5433
+  db:
+    build: .
+    container_name: graph_postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=rag_db
+    ports:
+      - "5433:5432"
+    volumes:
+      # [수정] 윈도우 에러 방지를 위해 도커 볼륨 사용
+      - graph_pg_data:/var/lib/postgresql/data
+
+  # 2. Graph DB (Neo4j) - 포트 7475, 7688
+  neo4j:
+    image: neo4j:5.11.0
+    container_name: graph_neo4j
+    restart: always
+    ports:
+      - "7475:7474"
+      - "7688:7687"
+    environment:
+      - NEO4J_AUTH=neo4j/password
+      - NEO4J_PLUGINS=["apoc"]
+    volumes:
+      # [수정] Neo4j도 안전하게 도커 볼륨 사용
+      - graph_neo4j_data:/data
+      - graph_neo4j_logs:/logs
+
+# 도커가 관리하는 저장소 생성
+volumes:
+  graph_pg_data:
+  graph_neo4j_data:
+  graph_neo4j_logs:

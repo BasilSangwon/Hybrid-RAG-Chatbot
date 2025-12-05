@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chatbot Admin Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --secondary: #475569;
+            --accent: #7c3aed;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-sub: #64748b;
+        }
+
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.5;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            background: var(--surface);
+            padding: 20px 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-badge.online {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-badge.offline {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 24px;
+        }
+
+        .dashboard-section {
+            margin-bottom: 40px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-left: 10px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .section-desc {
+            font-size: 14px;
+            color: var(--text-sub);
+        }
+
+        .card {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.05);
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: var(--secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-sub);
+            margin-bottom: 6px;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .btn-full {
+            width: 100%;
+        }
+
+        .btn-accent {
+            background: var(--accent);
+        }
+
+        .btn-danger {
+            background: #ef4444;
+        }
+
+        .btn-eval {
+            background: #db2777;
+        }
+
+        .list-container {
+            margin-top: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .list-item {
+            background: #f1f5f9;
+            padding: 12px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
+
+        .item-content {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .item-title {
+            font-weight: 600;
+        }
+
+        .item-desc {
+            font-size: 12px;
+            color: var(--text-sub);
+        }
+
+        .tool-box {
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .tool-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .score-board {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .score-item {
+            flex: 1;
+            background: #fdf2f8;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #fce7f3;
+        }
+
+        .score-value {
+            display: block;
+            font-size: 20px;
+            font-weight: 800;
+            color: #db2777;
+        }
+
+        .score-label {
+            font-size: 11px;
+            color: #be185d;
+        }
+
+        .step-badge {
+            background: var(--primary);
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .db-stat-badge {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+
+        .warning-text {
+            color: #ef4444;
+            font-size: 12px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        .debug-result {
+            margin-top: 10px;
+            padding: 10px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 12px;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        /* [NEW] Chart & Table Styles */
+        .chart-container {
+            position: relative;
+            height: 180px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .data-table th {
+            background: #f1f5f9;
+            padding: 8px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-sub);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .data-table td {
+            padding: 8px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        details {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+
+        details summary {
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1><span>🤖</span>AI Chatbot Admin Dashboard</h1>
+        <div id="server-status" class="status-badge offline">
+            <span id="status-icon">●</span><span id="status-text">연결 시도 중...</span>
+        </div>
+    </div>
+
+    <!-- Section 1: Configuration & Policy -->
+    <section class="dashboard-section">
+        <div class="section-header">
+            <div class="step-badge">1</div>
+            <div class="section-title">시스템 설정 및 정책 (Configuration & Policy)</div>
+            <div class="section-desc">AI의 페르소나와 답변 지침을 설정합니다.</div>
+        </div>
+        <div class="dashboard-grid">
+            <!-- Persona Config -->
+            <div class="card">
+                <h2>🎭 Active Persona</h2>
+                <div class="form-group">
+                    <label class="form-label">Name</label>
+                    <input type="text" id="p_name" placeholder="예: 친절한 상담원">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">System Prompt</label>
+                    <textarea id="p_prompt" rows="3" placeholder="예: 당신은 고객에게 항상 친절하게 응대해야 합니다."></textarea>
+                </div>
+                <button onclick="addPersona()" class="btn btn-full">페르소나 생성</button>
+                <div class="list-container" id="personaList"></div>
+            </div>
+
+            <!-- Answer Guidelines (Moved from bottom) -->
+            <div class="card">
+                <h2>📢 답변 지침 (가이드라인)</h2>
+                <div class="form-group">
+                    <label class="form-label">상황 (Context)</label>
+                    <input type="text" id="fb_context" placeholder="예: 경쟁사 언급 시">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">지침 (Guideline)</label>
+                    <textarea id="fb_guideline" placeholder="예: 우리 제품의 장점만 설명할 것."></textarea>
+                </div>
+                <button onclick="addFeedback()" class="btn btn-full" style="background:#ea580c; color:white;">지침
+                    등록</button>
+                <div class="list-container" id="feedbackList"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 2: Knowledge Base Ingestion -->
+    <section class="dashboard-section">
+        <div class="section-header">
+            <div class="step-badge" style="background: var(--accent);">2</div>
+            <div class="section-title">지식 데이터 학습 (Knowledge Base Ingestion)</div>
+            <div class="section-desc">문서를 업로드하고 Vector 및 Graph DB를 구축합니다.</div>
+        </div>
+        <div class="dashboard-grid">
+            <!-- Source Files -->
+            <div class="card">
+                <h2>📂 원본 문서 관리 (Source Files)</h2>
+                <div class="tool-box" style="background: #f8fafc; border-color: #cbd5e1;">
+                    <input type="file" id="pdfInput" accept=".pdf">
+                    <button onclick="uploadPdf()" class="btn btn-full"
+                        style="margin-top:10px; background:#475569; color:white;">PDF 업로드</button>
+                </div>
+                <div class="list-container" id="fileList"></div>
+            </div>
+
+            <!-- Vector RAG Experiment -->
+            <div class="card">
+                <h2 style="color:#0284c7;">🧩 Vector RAG (Basic) <span id="stat_vector"
+                        class="db-stat-badge">Loading...</span></h2>
+                <div class="chart-container"><canvas id="vectorChart"></canvas></div>
+                <div id="vector_status_msg" class="warning-text" style="display:none;">⚠️ 데이터가 없습니다! 임베딩을 실행해주세요.
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">실험 이름 (Experiment Name)</label>
+                    <input type="text" id="vec_exp_name" placeholder="비워두면 설정값에 따라 자동 생성됩니다">
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <div class="form-group" style="flex:1;">
+                        <label class="form-label">Chunk Size</label>
+                        <input type="number" id="vec_chunk_size" value="1000">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label class="form-label">Overlap</label>
+                        <input type="number" id="vec_chunk_overlap" value="100">
+                    </div>
+                </div>
+
+                <details>
+                    <summary>⚙️ 고급 설정 (Advanced)</summary>
+                    <div class="form-group" style="margin-top:10px;">
+                        <label class="form-label">Top-k (Retrieval Count)</label>
+                        <input type="number" id="vec_top_k" value="5" min="1" max="50">
+                    </div>
+                </details>
+
+                <button id="btnVector" onclick="runVectorIndex()" class="btn btn-full"
+                    style="background:#0284c7; color:white;">⚡ Vector DB 임베딩 시작</button>
+                <button onclick="resetVectorDB()" class="btn btn-full btn-sm"
+                    style="margin-top:8px; background:#fee2e2; color:#b91c1c; border:1px solid #fecaca;">🗑️ Vector
+                    DB 초기화</button>
+
+                <div style="margin-top:20px;">
+                    <div style="font-size:12px; font-weight:bold; color:#64748b; margin-bottom:5px;">Recent
+                        Experiments</div>
+                    <div style="overflow-x:auto;">
+                        <table class="data-table" id="vectorTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Config</th>
+                                    <th>Count</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="5">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Graph RAG Experiment -->
+            <div class="card" style="border-top: 4px solid var(--accent);">
+                <h2 style="color:var(--accent);">🕸️ Graph RAG (Advanced) <span id="stat_graph" class="db-stat-badge"
+                        style="background:#f3e8ff; color:#7c3aed;">Loading...</span></h2>
+                <div class="chart-container"><canvas id="graphChart"></canvas></div>
+
+                <div
+                    style="background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; padding: 12px; margin-bottom: 15px;">
+                    <div
+                        style="font-size: 11px; font-weight: bold; color: #7c3aed; margin-bottom: 4px; text-transform: uppercase;">
+                        DB에 저장된 모델별 데이터 현황</div>
+                    <div id="current_graph_model_container">
+                        <div style="text-align:center; color:#94a3b8; font-size:12px;">Loading stats...</div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">실험 이름 (Experiment Name)</label>
+                    <input type="text" id="graph_exp_name" placeholder="비워두면 설정값에 따라 자동 생성됩니다">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="color:var(--accent);">Extractor LLM 선택</label>
+                    <select id="graph_llm_select" onchange="checkGraphModelStatus()">
+                        <option>Loading models...</option>
+                    </select>
+                    <div id="model_learn_status" style="font-size:12px; margin-top:4px; font-weight:bold;"></div>
+                </div>
+
+                <div style="display:flex; gap:10px;">
+                    <div class="form-group" style="flex:1;">
+                        <label class="form-label">Chunk Size</label>
+                        <input type="number" id="graph_chunk_size" value="2000">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label class="form-label">Overlap</label>
+                        <input type="number" id="graph_chunk_overlap" value="200">
+                    </div>
+                </div>
+
+                <details>
+                    <summary>⚙️ 고급 설정 (Advanced)</summary>
+                    <div class="form-group" style="margin-top:10px;">
+                        <label class="form-label">Temperature (0.0 ~ 1.0)</label>
+                        <input type="range" id="graph_temp" min="0" max="1" step="0.1" value="0.0"
+                            oninput="document.getElementById('temp_val').innerText=this.value">
+                        <span id="temp_val" style="font-size:12px; font-weight:bold;">0.0</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Prompt Template (Optional)</label>
+                        <textarea id="graph_prompt" rows="2" placeholder="기본 프롬프트 사용 시 비워두세요."></textarea>
+                    </div>
+                </details>
+
+                <div style="display:flex; gap:10px;">
+                    <button id="btnGraph" onclick="runGraphIndex()" class="btn btn-full btn-accent" style="flex:2;">🏗️
+                        구축 시작 (데이터 추가)</button>
+                    <button onclick="deleteGraphModel()" class="btn btn-full btn-danger"
+                        style="flex:1; font-size:12px; border:1px solid #fecaca; background:#fee2e2; color:#b91c1c;">🗑️
+                        선택 모델 삭제</button>
+                </div>
+
+                <div style="margin-top:20px;">
+                    <div style="font-size:12px; font-weight:bold; color:#64748b; margin-bottom:5px;">Recent
+                        Experiments</div>
+                    <div style="overflow-x:auto;">
+                        <table class="data-table" id="graphTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Config</th>
+                                    <th>Count</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="5">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 3: Evaluation & QA -->
+    <section class="dashboard-section">
+        <div class="section-header">
+            <div class="step-badge" style="background: linear-gradient(135deg, #ec4899, #db2777);">3</div>
+            <div class="section-title">품질 평가 및 데이터셋 구축 (Evaluation & QA)</div>
+            <div class="section-desc">평가 데이터셋을 관리하고 RAGAS 성능을 측정합니다.</div>
+        </div>
+        <div class="dashboard-grid">
+            <!-- Golden Dataset (Combined Manual QA & Auto QA) -->
+            <div class="card">
+                <h2>📝 정답 캐시 및 데이터셋 (Golden Data & Cache)</h2>
+
+                <!-- Part A: Auto Generator -->
+                <div class="sub-card"
+                    style="border:1px solid #e2e8f0; padding:16px; border-radius:12px; margin-bottom:20px; background:#f8fafc;">
+                    <h3 style="margin-top:0; font-size:15px; color:#2563eb;">🤖 AI로 QA 세트 자동 생성</h3>
+                    <p style="font-size:12px; color:#64748b; margin-bottom:12px;">PDF 문서를 분석하여 예상 질문과 답변 세트를 자동으로 구축합니다.
+                        (초기 구축 추천)</p>
+                    <div style="display:flex; gap:8px;">
+                        <select id="qa_source_file" style="flex:1;">
+                            <option value="">파일 선택...</option>
+                        </select>
+                        <button onclick="generateAIQA()" class="btn"
+                            style="background:#6366f1; color:white; white-space:nowrap;">Q&A 자동 생성 시작</button>
+                    </div>
+                </div>
+
+                <!-- Part B: Manual Entry -->
+                <div class="sub-card"
+                    style="border:1px solid #e2e8f0; padding:16px; border-radius:12px; margin-bottom:20px; background:#fff;">
+                    <h3 style="margin-top:0; font-size:15px; color:#059669;">✍️ 수동 정답 등록 (Human-in-the-loop)</h3>
+                    <p style="font-size:12px; color:#64748b; margin-bottom:12px;">법적 규정, 최신 정보 등 AI가 놓친 디테일을 직접 주입합니다.
+                        (1순위 검색)</p>
+                    <div class="form-group">
+                        <label class="form-label">질문 (Question)</label>
+                        <input type="text" id="q_input" placeholder="예: 반품 규정이 어떻게 되나요?">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">정답 (Answer)</label>
+                        <input type="text" id="a_input" placeholder="예: 구매 후 7일 이내 가능합니다.">
+                    </div>
+                    <button onclick="addAnswer()" class="btn btn-full btn-primary">정답 등록</button>
+                </div>
+
+                <!-- Part C: Management Table -->
+                <div class="sub-card">
+                    <h3 style="margin-top:0; font-size:15px; color:#475569;">📋 등록된 지식 목록 (Knowledge Base)</h3>
+                    <div style="overflow-x:auto;">
+                        <table class="data-table" id="qaTable">
+                            <thead>
+                                <tr>
+                                    <th style="width:50px;">ID</th>
+                                    <th>Question</th>
+                                    <th>Answer</th>
+                                    <th style="width:80px;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="4" style="text-align:center; color:#94a3b8;">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RAGAS Evaluation -->
+            <div class="card" style="border-top: 4px solid #db2777;">
+                <h2>📊 RAGAS 성능 성적표</h2>
+                <div id="evalResult" style="display:none; margin-bottom:20px;">
+                    <div class="score-board">
+                        <div class="score-item"><span class="score-label">Faithfulness</span><span class="score-value"
+                                id="score_faith">0.0</span></div>
+                        <div class="score-item"><span class="score-label">Relevance</span><span class="score-value"
+                                id="score_rel">0.0</span></div>
+                        <div class="score-item"><span class="score-label">Precision</span><span class="score-value"
+                                id="score_prec">0.0</span></div>
+                    </div>
+                    <div class="list-container" id="evalDetails"
+                        style="border:1px solid #fce7f3; background:#fff1f2; border-radius:12px; padding:10px;">
+                    </div>
+                </div>
+                <button onclick="runEvaluation()" id="btnEval" class="btn btn-full btn-eval">📝 평가 시작 (Start
+                    Evaluation)</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section 4: Monitoring & Debugging -->
+    <section class="dashboard-section">
+        <div class="section-header">
+            <div class="step-badge" style="background: #10b981;">4</div>
+            <div class="section-title">모니터링 및 디버깅 (Monitoring & Debugging)</div>
+            <div class="section-desc">검색 엔진을 테스트하고 리소스 사용량을 확인합니다.</div>
+        </div>
+        <div class="dashboard-grid">
+            <!-- Search Debugger -->
+            <div class="card">
+                <h2>🔍 검색 디버거 (Search Debugger)</h2>
+                <div class="tool-box" style="background: #fffbeb; border-color: #fcd34d;">
+                    <div style="display:flex; gap:8px; margin-bottom:8px;">
+                        <select id="debug_mode" style="width:120px;">
+                            <option value="hybrid">Hybrid</option>
+                            <option value="vector">Vector Only</option>
+                            <option value="keyword">Keyword Only</option>
+                        </select>
+                        <input type="text" id="debug_query" placeholder="테스트할 질문 입력..." style="background:white;">
+                    </div>
+                    <button onclick="runSearchTest()" class="btn btn-full" style="background:#d97706; color:white;">🚀
+                        검색 엔진 성능 테스트</button>
+                    <div id="debugResult" class="debug-result"></div>
+                </div>
+            </div>
+
+            <!-- Resource Monitoring -->
+            <div class="card" style="border-top: 4px solid #10b981;">
+                <h2 style="color:#059669;">💰 Token Usage & Cost</h2>
+                <div class="score-board" style="background:#ecfdf5; margin-bottom:20px;">
+                    <div class="score-item"><span class="score-label" style="color:#059669;">Total Cost
+                            (USD)</span><span class="score-value" id="total_cost" style="color:#047857;">$0.0000</span>
+                    </div>
+                    <div class="score-item"><span class="score-label" style="color:#059669;">Total Input
+                            Tokens</span><span class="score-value" id="total_input" style="color:#047857;">0</span>
+                    </div>
+                    <div class="score-item"><span class="score-label" style="color:#059669;">Total Output
+                            Tokens</span><span class="score-value" id="total_output" style="color:#047857;">0</span>
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h3 style="font-size:14px; color:#334155; margin:0;">Recent Sessions</h3>
+                    <button onclick="loadUsageStats()" class="btn btn-sm" style="background:#10b981; color:white;">🔄
+                        Refresh</button>
+                </div>
+                <div class="list-container" id="usageList" style="max-height: 400px;">
+                    <div style="text-align:center; color:#94a3b8; font-size:12px; padding:10px;">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        const API = "http://127.0.0.1:8000";
+        let isServerOnline = false;
+        let learnedModels = [];
+        let lastVectorStatus = 'idle';
+        let lastGraphStatus = 'idle';
+        let vectorChartInstance = null;
+        let graphChartInstance = null;
+
+        // --- Init ---
+        async function checkServerStatus() {
+            const statusBadge = document.getElementById('server-status');
+            const statusText = document.getElementById('status-text');
+            try {
+                const res = await fetch(API + '/api/personas', { method: 'GET', signal: AbortSignal.timeout(2000) });
+                if (res.ok) {
+                    if (!isServerOnline) {
+                        statusBadge.className = 'status-badge online';
+                        statusText.innerText = "서버 정상 (Online)";
+                        isServerOnline = true;
+                        refreshAllData();
+                    }
+                } else throw new Error();
+            } catch (e) {
+                if (isServerOnline || statusText.innerText.includes("시도 중")) {
+                    statusBadge.className = 'status-badge offline';
+                    statusText.innerText = "연결 끊김 (Offline)";
+                    isServerOnline = false;
+                }
+            }
+        }
+
+        setInterval(checkServerStatus, 3000);
+        checkServerStatus();
+
+        // --- Polling ---
+        async function checkJobStatus() {
+            if (!isServerOnline) return;
+            try {
+                const res = await fetch(API + '/api/job_status');
+                const status = await res.json();
+
+                const btnVec = document.getElementById('btnVector');
+                if (status.vector === 'running') {
+                    btnVec.disabled = true;
+                    btnVec.innerText = "⏳ Vector 임베딩 진행 중...";
+                } else {
+                    btnVec.disabled = false;
+                    btnVec.innerText = "⚡ Vector DB 임베딩 시작";
+                    if (lastVectorStatus === 'running') {
+                        loadDBStats(); loadUsageStats(); loadExperiments();
+                        alert("Vector 임베딩이 완료되었습니다!");
+                    }
+                }
+                lastVectorStatus = status.vector;
+
+                const btnGraph = document.getElementById('btnGraph');
+                if (status.graph === 'running') {
+                    btnGraph.disabled = true;
+                    btnGraph.innerText = "⏳ Graph 구축 진행 중...";
+                } else {
+                    btnGraph.disabled = false;
+                    btnGraph.innerText = "🏗️ 구축 시작 (데이터 추가)";
+                    if (lastGraphStatus === 'running') {
+                        loadDBStats(); loadUsageStats(); loadExperiments();
+                        alert("Graph 구축이 완료되었습니다!");
+                    }
+                }
+                lastGraphStatus = status.graph;
+            } catch (e) { }
+        }
+
+        setInterval(checkJobStatus, 2000);
+
+        function refreshAllData() {
+            loadPersonas();
+            loadFiles();
+            loadAnswers();
+            loadFeedback();
+            loadFileOptions();
+            loadDBStats();
+            loadModels();
+            loadUsageStats();
+            loadExperiments();
+        }
+
+        // --- Experiments (New) ---
+        async function loadExperiments() {
+            try {
+                const res = await fetch(API + '/api/experiments');
+                const data = await res.json();
+
+                renderTable('vectorTable', data.vector);
+                renderTable('graphTable', data.graph);
+
+                updateChart('vectorChart', data.vector, 'Vector Chunks', '#0284c7');
+                updateChart('graphChart', data.graph, 'Graph Nodes', '#7c3aed');
+            } catch (e) { console.error("Failed to load experiments", e); }
+        }
+
+        function renderTable(tableId, data) {
+            const tbody = document.querySelector(`#${tableId} tbody`);
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#94a3b8;">No experiments yet.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(e => `
+                <tr>
+                    <td>${e.id}</td>
+                    <td style="font-weight:bold;">${e.name}</td>
+                    <td style="font-size:11px;">
+                        ${e.config.chunk_size ? `Chunk: ${e.config.chunk_size}` : ''}
+                        ${e.config.llm_model ? `<br>Model: ${e.config.llm_model}` : ''}
+                    </td>
+                    <td style="text-align:right; font-weight:bold;">${e.count}</td>
+                    <td style="text-align:center;">
+                        <button onclick="deleteExperiment(${e.id})" class="btn btn-sm btn-danger">삭제</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function updateChart(canvasId, data, label, color) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            const recent = data.slice(0, 5).reverse();
+            const labels = recent.map(d => d.name);
+            const counts = recent.map(d => d.count);
+
+            const config = {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: counts,
+                        backgroundColor: color,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true } }
+                }
+            };
+
+            if (canvasId === 'vectorChart') {
+                if (vectorChartInstance) vectorChartInstance.destroy();
+                vectorChartInstance = new Chart(ctx, config);
+            } else {
+                if (graphChartInstance) graphChartInstance.destroy();
+                graphChartInstance = new Chart(ctx, config);
+            }
+        }
+
+        async function deleteExperiment(id) {
+            if (!confirm("정말로 이 실험 데이터를 삭제하시겠습니까? (복구 불가)")) return;
+            try {
+                const res = await fetch(API + `/api/experiments/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    alert(data.message);
+                    loadExperiments();
+                    loadDBStats();
+                } else {
+                    alert("삭제 실패: " + data.message);
+                }
+            } catch (e) { alert("Error: " + e); }
+        }
+
+        // --- Existing Functions ---
+        async function loadUsageStats() {
+            try {
+                const resStats = await fetch(API + '/api/stats');
+                const dataStats = await resStats.json();
+                document.getElementById('total_cost').innerText = `$${dataStats.total_cost}`;
+                document.getElementById('total_input').innerText = dataStats.total_input_tokens || 0;
+                document.getElementById('total_output').innerText = dataStats.total_output_tokens || 0;
+
+                const resUsage = await fetch(API + '/api/usage');
+                const dataUsage = await resUsage.json();
+                const list = document.getElementById('usageList');
+                if (dataUsage.length === 0) {
+                    list.innerHTML = '<div style="text-align:center; color:#94a3b8; font-size:12px; padding:10px;">No usage data yet.</div>';
+                    return;
+                }
+                list.innerHTML = `<table style="width:100%; border-collapse:collapse; font-size:13px;">
+                    <thead style="background:#f1f5f9; color:#64748b;">
+                        <tr><th style="padding:8px; text-align:left;">Model</th><th style="padding:8px; text-align:right;">Input</th><th style="padding:8px; text-align:right;">Output</th><th style="padding:8px; text-align:right;">Cost</th><th style="padding:8px; text-align:right;">Time</th></tr>
+                    </thead>
+                    <tbody>
+                        ${dataUsage.map(d => `
+                            <tr style="border-bottom:1px solid #e2e8f0;">
+                                <td style="padding:8px; color:#334155; font-weight:600;">${d.model_name}</td>
+                                <td style="padding:8px; text-align:right; color:#475569;">${d.input_tokens}</td>
+                                <td style="padding:8px; text-align:right; color:#475569;">${d.output_tokens}</td>
+                                <td style="padding:8px; text-align:right; color:#059669; font-weight:bold;">$${d.cost_usd.toFixed(5)}</td>
+                                <td style="padding:8px; text-align:right; color:#94a3b8; font-size:11px;">${new Date(d.timestamp).toLocaleTimeString()}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>`;
+            } catch (e) { }
+        }
+
+        async function loadDBStats() {
+            try {
+                const res = await fetch(API + '/api/stats');
+                const data = await res.json();
+
+                // Vector Badge
+                const vBadge = document.getElementById('stat_vector');
+                const count = data.vector_count || 0;
+                vBadge.innerText = `현재: ${count} Chunks`;
+                if (count === 0) {
+                    vBadge.style.color = '#ef4444';
+                    vBadge.style.background = '#fee2e2';
+                    document.getElementById('vector_status_msg').style.display = 'block';
+                } else {
+                    vBadge.style.color = '#0369a1';
+                    vBadge.style.background = '#e0f2fe';
+                    document.getElementById('vector_status_msg').style.display = 'none';
+                }
+
+                // Graph Badge
+                const gBadge = document.getElementById('stat_graph');
+                gBadge.innerText = `현재: ${data.graph_count} Nodes`;
+                gBadge.style.color = data.graph_count > 0 ? '#7c3aed' : '#64748b';
+                gBadge.style.background = data.graph_count > 0 ? '#f3e8ff' : '#f1f5f9';
+
+                // Graph Details Table
+                const graphDetails = data.graph_details || [];
+                learnedModels = graphDetails.map(d => d.model);
+                const graphStatusDiv = document.getElementById('current_graph_model_container');
+                if (graphStatusDiv) {
+                    if (graphDetails.length === 0) {
+                        graphStatusDiv.innerHTML = `<div style="padding:10px; text-align:center; color:#94a3b8;">데이터 없음</div>`;
+                    } else {
+                        graphStatusDiv.innerHTML = `<table style="width:100%; border-collapse:collapse; font-size:13px; margin-top:5px;">
+                            <thead style="background:#f5f3ff; color:#5b21b6;">
+                                <tr><th style="padding:6px; text-align:left;">Model Name</th><th style="padding:6px; text-align:center;">Files</th><th style="padding:6px; text-align:right;">Nodes</th><th style="padding:6px; text-align:center;">Action</th></tr>
+                            </thead>
+                            <tbody>
+                                ${graphDetails.map(d => `
+                                    <tr style="border-bottom:1px solid #ddd6fe;">
+                                        <td style="padding:6px; font-weight:600; color:#4c1d95;">${d.model}</td>
+                                        <td style="padding:6px; text-align:center;">${d.files ? d.files.length : 0} files</td>
+                                        <td style="padding:6px; text-align:right;">${d.count}</td>
+                                        <td style="padding:6px; text-align:center;">
+                                            <button onclick="deleteGraphModelData('${d.model}')" style="padding:2px 6px; font-size:11px; background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; border-radius:4px; cursor:pointer;">삭제</button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>`;
+                    }
+                }
+                checkGraphModelStatus();
+            } catch (e) { }
+        }
+
+        async function deleteGraphModelData(modelName) {
+            if (!confirm(`정말로 '${modelName}' 모델로 생성된 모든 그래프 데이터를 삭제하시겠습니까?`)) return;
+            try {
+                const res = await fetch(API + `/api/graph/model/${modelName}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    alert(data.message);
+                    loadDBStats();
+                } else {
+                    alert("삭제 실패: " + data.message);
+                }
+            } catch (e) { alert("오류: " + e); }
+        }
+
+        async function loadModels() {
+            const sel = document.getElementById('graph_llm_select');
+            try {
+                const res = await fetch(API + '/api/models');
+                const models = await res.json();
+                const groups = { "Gemini 3 Series": [], "Gemini 2.5 Series": [], "Gemini 2.0 Series": [], "Gemini 1.5 Series": [], "Others": [] };
+
+                models.forEach(m => {
+                    const name = m.id;
+                    if (name.includes("gemini-3")) groups["Gemini 3 Series"].push(m);
+                    else if (name.includes("gemini-2.5")) groups["Gemini 2.5 Series"].push(m);
+                    else if (name.includes("gemini-2.0")) groups["Gemini 2.0 Series"].push(m);
+                    else if (name.includes("gemini-1.5")) groups["Gemini 1.5 Series"].push(m);
+                    else groups["Others"].push(m);
+                });
+
+                let html = "";
+                for (const [label, list] of Object.entries(groups)) {
+                    if (list.length > 0) {
+                        html += `<optgroup label="${label}">` + list.map(m => `<option value="${m.id}">${m.display_name}</option>`).join('') + `</optgroup>`;
+                    }
+                }
+                sel.innerHTML = html;
+                checkGraphModelStatus();
+            } catch (e) {
+                sel.innerHTML = '<option value="gemini-2.0-flash">Gemini 2.0 Flash (Fallback)</option>';
+            }
+        }
+
+        function checkGraphModelStatus() {
+            const sel = document.getElementById('graph_llm_select');
+            const statusDiv = document.getElementById('model_learn_status');
+            if (learnedModels.includes(sel.value)) statusDiv.innerHTML = `<span style="color:#166534;">✅ 이미 학습된 모델입니다.</span>`;
+            else statusDiv.innerHTML = `<span style="color:#94a3b8;">❌ 아직 학습되지 않은 모델입니다.</span>`;
+        }
+
+        // --- Action Functions ---
+        async function loadPersonas() {
+            try {
+                const res = await fetch(API + '/api/personas');
+                const data = await res.json();
+                document.getElementById('personaList').innerHTML = data.map(p => `
+                    <div class="list-item" style="${p.active ? 'border: 2px solid var(--accent); background: #f3e8ff;' : ''}">
+                        <div class="item-content">
+                            <span class="item-title">${p.active ? '✅ ' : ''}${p.name}</span>
+                            <span class="item-desc">${p.system_prompt}</span>
+                        </div>
+                        ${!p.active ? `<button onclick="activatePersona(${p.id})" class="btn btn-sm btn-accent">선택</button>` : '<span style="color:var(--accent); font-size:11px; font-weight:bold;">Active</span>'}
+                    </div>
+                `).join('');
+            } catch (e) { }
+        }
+
+        async function addPersona() {
+            const n = document.getElementById('p_name').value;
+            const p = document.getElementById('p_prompt').value;
+            if (!n || !p) return;
+            await fetch(API + '/api/personas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: n, system_prompt: p })
+            });
+            document.getElementById('p_name').value = '';
+            document.getElementById('p_prompt').value = '';
+            loadPersonas();
+        }
+
+        async function activatePersona(id) {
+            if (confirm("변경?")) {
+                await fetch(API + `/api/personas/${id}/activate`, { method: 'POST' });
+                loadPersonas();
+            }
+        }
+
+        async function loadFiles() {
+            try {
+                const res = await fetch(API + '/api/files');
+                const files = await res.json();
+                document.getElementById('fileList').innerHTML = files.map(f => `
+                    <div class="list-item">
+                        <span class="item-title">📄 ${f}</span>
+                        <button onclick="deleteFile('${f}')" class="btn btn-sm btn-danger">삭제</button>
+                    </div>
+                `).join('');
+            } catch (e) { }
+        }
+
+        async function deleteFile(filename) {
+            if (confirm(`정말로 ${filename} 파일을 삭제하시겠습니까?`)) {
+                await fetch(API + `/api/files/${filename}`, { method: 'DELETE' });
+                loadFiles();
+            }
+        }
+
+        async function uploadPdf() {
+            const file = document.getElementById('pdfInput').files[0];
+            if (!file) return alert("파일 선택 필요");
+            const form = new FormData();
+            form.append("file", file);
+            await fetch(API + '/api/upload', { method: 'POST', body: form });
+            alert("업로드 완료");
+            loadFiles();
+            loadFileOptions();
+        }
+
+        // [MODIFIED] Run Vector
+        async function runVectorIndex() {
+            if (!isServerOnline) return alert("서버 연결 필요");
+            const name = document.getElementById('vec_exp_name').value;
+            // Name validation removed for auto-gen
+            const chunkSize = parseInt(document.getElementById('vec_chunk_size').value) || 1000;
+            const overlap = parseInt(document.getElementById('vec_chunk_overlap').value) || 100;
+            const topK = parseInt(document.getElementById('vec_top_k').value) || 5;
+
+            if (!confirm(`[${name || 'Auto-Generate'}] Vector 실험을 시작하시겠습니까?`)) return;
+
+            const payload = {
+                type: 'vector',
+                name: name,
+                config: { chunk_size: chunkSize, chunk_overlap: overlap, top_k: topK }
+            };
+
+            await fetch(API + '/api/ingest', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            alert("백그라운드에서 임베딩 실험이 시작되었습니다.");
+        }
+
+        async function resetVectorDB() {
+            if (confirm("정말로 Vector DB를 초기화하시겠습니까? (복구 불가)")) {
+                await fetch(API + '/api/vector_store', { method: 'DELETE' });
+                alert("초기화됨");
+                loadDBStats();
+            }
+        }
+
+        // [MODIFIED] Run Graph
+        async function runGraphIndex() {
+            if (!isServerOnline) return alert("서버 연결 필요");
+            const name = document.getElementById('graph_exp_name').value;
+            // Name validation removed for auto-gen
+            const model = document.getElementById('graph_llm_select').value;
+            const temp = parseFloat(document.getElementById('graph_temp').value);
+            const prompt = document.getElementById('graph_prompt').value;
+
+            const chunkSize = parseInt(document.getElementById('graph_chunk_size').value) || 2000;
+            const overlap = parseInt(document.getElementById('graph_chunk_overlap').value) || 200;
+
+            if (!confirm(`[${name || 'Auto-Generate'}] Graph 실험을 시작하시겠습니까? (Model: ${model}, Chunk: ${chunkSize})`)) return;
+
+            const payload = {
+                type: 'graph',
+                name: name,
+                config: {
+                    llm_model: model,
+                    temperature: temp,
+                    prompt_template: prompt,
+                    chunk_size: chunkSize,
+                    chunk_overlap: overlap
+                }
+            };
+
+            await fetch(API + '/api/ingest', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            alert("백그라운드에서 Graph 실험이 시작되었습니다.");
+        }
+
+        async function deleteGraphModel() {
+            alert("기능 준비 중입니다. 위의 모델별 삭제 버튼을 이용해주세요.");
+        }
+
+                async function loadFileOptions() {
+            try {
+                const res = await fetch(API + '/api/files');
+                const files = await res.json();
+                const select = document.getElementById('qa_source_file');
+                if (select) {
+                    select.innerHTML = '<option value="">파일 선택...</option>' + 
+                        files.map(f => `<option value="${f}">${f}</option>`).join('');
+                }
+            } catch (e) { }
+        }
+
+                async function generateAIQA() {
+            const file = document.getElementById('qa_source_file').value;
+            if (!file) return alert("분석할 PDF 파일을 선택해주세요.");
+            
+            if (!confirm(`'${file}' 파일을 분석하여 QA 데이터셋을 자동 생성하시겠습니까? (시간이 소요됩니다)`)) return;
+            
+            try {
+                const res = await fetch(API + '/api/generate_qa', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename: file })
+                });
+                const data = await res.json();
+                alert(data.message);
+            } catch (e) {
+                alert("요청 실패: " + e);
+            }
+        }
+
+                async function loadAnswers() {
+            try {
+                const res = await fetch(API + '/api/answers');
+                const data = await res.json();
+                const tbody = document.querySelector('#qaTable tbody');
+                if (!tbody) return;
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#94a3b8;">데이터가 없습니다.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.map(a => `
+                    <tr>
+                        <td style="text-align:center; color:#64748b;">${a.id}</td>
+                        <td style="font-weight:600;">${a.question}</td>
+                        <td style="color:#475569;">${a.answer}</td>
+                        <td style="text-align:center;">
+                            <button onclick="deleteAnswer(${a.id})" class="btn btn-sm btn-danger">삭제</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) { }
+        }
+
+        async function addAnswer() {
+            const q = document.getElementById('q_input').value;
+            const a = document.getElementById('a_input').value;
+            if (!q || !a) return;
+            await fetch(API + '/api/answers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question: q, answer: a })
+            });
+            document.getElementById('q_input').value = '';
+            document.getElementById('a_input').value = '';
+            loadAnswers();
+        }
+
+        async function deleteAnswer(id) {
+            if (confirm("삭제?")) {
+                await fetch(API + `/api/answers/${id}`, { method: 'DELETE' });
+                loadAnswers();
+            }
+        }
+
+        async function loadFeedback() {
+            try {
+                const res = await fetch(API + '/api/feedback');
+                const data = await res.json();
+                document.getElementById('feedbackList').innerHTML = data.map(f => `
+                    <div class="list-item">
+                        <div class="item-content">
+                            <span class="item-title">Context: ${f.context}</span>
+                            <span class="item-desc">Guide: ${f.guideline}</span>
+                        </div>
+                        <button onclick="deleteFeedback(${f.id})" class="btn btn-sm btn-danger">삭제</button>
+                    </div>
+                `).join('');
+            } catch (e) { }
+        }
+
+        async function addFeedback() {
+            const c = document.getElementById('fb_context').value;
+            const g = document.getElementById('fb_guideline').value;
+            if (!c || !g) return;
+            await fetch(API + '/api/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ context: c, guideline: g })
+            });
+            document.getElementById('fb_context').value = '';
+            document.getElementById('fb_guideline').value = '';
+            loadFeedback();
+        }
+
+        async function deleteFeedback(id) {
+            if (confirm("삭제?")) {
+                await fetch(API + `/api/feedback/${id}`, { method: 'DELETE' });
+                loadFeedback();
+            }
+        }
+
+        async function runSearchTest() {
+            const mode = document.getElementById('debug_mode').value;
+            const query = document.getElementById('debug_query').value;
+            if (!query) return alert("질문을 입력하세요");
+            document.getElementById('debugResult').innerText = "검색 중...";
+            try {
+                const res = await fetch(API + '/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: query, model: 'gemini-2.0-flash', rag_type: mode, session_id: 'debug' })
+                });
+                const text = await res.text();
+                document.getElementById('debugResult').innerText = text;
+            } catch (e) {
+                document.getElementById('debugResult').innerText = "Error: " + e;
+            }
+        }
+
+        async function runEvaluation() {
+            document.getElementById('btnEval').disabled = true;
+            document.getElementById('btnEval').innerText = "⏳ 평가 진행 중...";
+            try {
+                const res = await fetch(API + '/api/evaluate', { method: 'POST' });
+                const data = await res.json();
+                const r = data.result;
+                document.getElementById('evalResult').style.display = 'block';
+                document.getElementById('score_faith').innerText = r.faithfulness;
+                document.getElementById('score_rel').innerText = r.answer_relevancy;
+                document.getElementById('score_prec').innerText = r.context_precision;
+                document.getElementById('evalDetails').innerHTML = r.details.map(d => `
+                    <div style="margin-bottom:8px; font-size:12px;">
+                        <strong>Q: ${d.question}</strong><br>
+                        A: ${d.answer}<br>
+                        <span style="color:#db2777;">Faith: ${d.faithfulness}, Rel: ${d.relevancy}</span>
+                    </div>
+                `).join('');
+            } catch (e) { alert("평가 실패"); }
+            document.getElementById('btnEval').disabled = false;
+            document.getElementById('btnEval').innerText = "📝 평가 시작 (Start Evaluation)";
+        }
+    </script>
+</body>
+
+</html>

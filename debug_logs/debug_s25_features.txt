@@ -1,0 +1,3 @@
+--- Requirements of '실시간 통역' ---
+'실시간 통역' -[REQUIRES]-> ['Condition'] (Network Connection)
+'실시간 통역' -[REQUIRES]-> ['Condition'] (Samsung Account)

@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI Chat Service</title>
+    <link rel="stylesheet" as="style" crossorigin
+        href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.8/dist/web/static/pretendard.css" />
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            --bg-body: #f8fafc;
+            --bg-chat: #ffffff;
+            --primary: #4f46e5;
+            --primary-light: #e0e7ff;
+            --text-main: #334155;
+            --text-sub: #64748b;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        body {
+            font-family: "Pretendard Variable", Pretendard, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-body);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--text-main);
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 500px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-chat);
+            box-shadow: var(--shadow);
+            position: relative;
+        }
+
+        @media (min-width: 600px) {
+            .chat-container {
+                height: 90vh;
+                border-radius: 20px;
+                overflow: hidden;
+            }
+        }
+
+        /* 헤더 영역 */
+        .header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 10;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* 상태 배지 */
+        .status-badge {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .status-badge.online {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-badge.offline {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        /* 설정 버튼 */
+        .settings-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 4px;
+            border-radius: 50%;
+            transition: background 0.2s;
+            color: var(--text-sub);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .settings-btn:hover {
+            background: var(--bg-body);
+            color: var(--text-main);
+        }
+
+        /* 설정 패널 (개발자 모드) */
+        .settings-panel {
+            display: none;
+            /* 기본적으로 숨김 */
+            margin-top: 15px;
+            padding: 15px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            flex-direction: column;
+            gap: 10px;
+            animation: slideDown 0.2s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .settings-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-sub);
+            margin-bottom: 2px;
+            text-transform: uppercase;
+        }
+
+        .config-select {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: white;
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 13px;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .config-select:focus {
+            border-color: var(--primary);
+        }
+
+        /* 페르소나 알림 */
+        .persona-info {
+            font-size: 12px;
+            color: var(--text-sub);
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        /* 채팅 영역 */
+        .chat-box {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background-color: #f8fafc;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .user-message {
+            align-items: flex-end;
+        }
+
+        .bot-message {
+            align-items: flex-start;
+        }
+
+        .message-content {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 14px;
+            line-height: 1.6;
+            word-wrap: break-word;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .user-message .message-content {
+            background-color: var(--primary);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .bot-message .message-content {
+            background-color: white;
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 4px;
+        }
+
+        /* 마크다운 스타일링 */
+        .bot-content p {
+            margin: 0 0 8px 0;
+        }
+
+        .bot-content p:last-child {
+            margin: 0;
+        }
+
+        .bot-content ul,
+        .bot-content ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+
+        .bot-content li {
+            margin-bottom: 4px;
+        }
+
+        .bot-content code {
+            background: #f1f5f9;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #db2777;
+            font-size: 0.9em;
+        }
+
+        .bot-content pre {
+            background: #1e293b;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+
+        .bot-content strong {
+            color: var(--primary);
+        }
+
+        /* 입력 영역 */
+        .input-area {
+            padding: 15px;
+            background: white;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        #user-input {
+            flex-grow: 1;
+            padding: 12px 15px;
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            font-size: 14px;
+            font-family: inherit;
+            background: #f8fafc;
+            outline: none;
+            transition: 0.2s;
+        }
+
+        #user-input:focus {
+            background: white;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        #send-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: var(--primary);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+        }
+
+        #send-btn:hover {
+            background: #4338ca;
+            transform: scale(1.05);
+        }
+
+        #send-btn:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+        }
+
+        #send-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: white;
+        }
+
+        /* 로딩 애니메이션 */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 10px 15px;
+            background: white;
+            border-radius: 16px;
+            width: fit-content;
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background: #cbd5e1;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .typing-dot:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        @keyframes bounce {
+
+            0%,
+            80%,
+            100% {
+                transform: scale(0);
+            }
+
+            40% {
+                transform: scale(1);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="chat-container">
+        <div class="header">
+            <div class="header-top">
+                <div class="brand">
+                    <span>AI Chatbot</span>
+                </div>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <div id="server-status" class="status-badge offline">
+                        <span class="status-dot"></span> <span id="status-text">Connecting...</span>
+                    </div>
+                    <button class="settings-btn" onclick="toggleSettings()" title="Developer Settings">
+                        ⚙️
+                    </button>
+                </div>
+            </div>
+
+            <!-- Developer Settings Panel (Hidden by default) -->
+            <div id="dev-settings" class="settings-panel">
+                <div>
+                    <div class="settings-label">LLM Model</div>
+                    <select id="model-select" class="config-select">
+                        <option>Loading models...</option>
+                    </select>
+                </div>
+
+                <div style="display:flex; gap:10px;">
+                    <div style="flex:1;">
+                        <div class="settings-label">RAG Type</div>
+                        <select id="rag-select" class="config-select" onchange="toggleGraphSource()">
+                            <option value="hybrid">Hybrid RAG</option>
+                            <option value="vector">Vector Only</option>
+                            <option value="graph">Graph Only</option>
+                        </select>
+                    </div>
+                    <div style="flex:1; display:none;" id="graph-source-container">
+                        <div class="settings-label">Graph Source</div>
+                        <select id="graph-source-select" class="config-select">
+                            <option value="all">All Sources</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="persona-info">
+                <span id="active-persona-text">Connecting...</span>
+            </div>
+        </div>
+
+        <div id="chat-box" class="chat-box">
+            <div class="message bot-message">
+                <div class="message-content bot-content">
+                    안녕하세요! 무엇을 도와드릴까요?<br>
+                    제품 매뉴얼에 기반하여 답변해 드립니다.
+                </div>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="질문을 입력하세요..." autocomplete="off">
+            <button id="send-btn">
+                <svg viewBox="0 0 24 24">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const input = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const modelSelect = document.getElementById('model-select');
+        const ragSelect = document.getElementById('rag-select');
+        const graphSourceSelect = document.getElementById('graph-source-select');
+        const graphSourceContainer = document.getElementById('graph-source-container');
+        const settingsPanel = document.getElementById('dev-settings');
+        const API_URL = "http://127.0.0.1:8000";
+
+        // 세션 ID 생성
+        const SESSION_ID = 'sess_' + Math.random().toString(36).substr(2, 9);
+        console.log("Current Session ID:", SESSION_ID);
+
+        function initChat() {
+            sendBtn.addEventListener('click', sendMessage);
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') sendMessage();
+            });
+        }
+
+        function toggleSettings() {
+            if (settingsPanel.style.display === 'none' || settingsPanel.style.display === '') {
+                settingsPanel.style.display = 'flex';
+            } else {
+                settingsPanel.style.display = 'none';
+            }
+        }
+
+        function toggleGraphSource() {
+            const mode = ragSelect.value;
+            if (mode === 'graph' || mode === 'hybrid') {
+                graphSourceContainer.style.display = 'block';
+            } else {
+                graphSourceContainer.style.display = 'none';
+            }
+        }
+
+        // --- Load Models & Graph Stats ---
+        async function loadChatModels() {
+            try {
+                // 1. Chat Models
+                const res = await fetch(API_URL + '/api/models');
+                const models = await res.json();
+
+                if (models && models.length > 0) {
+                    modelSelect.innerHTML = models.map(m =>
+                        `<option value="${m.id}">${m.display_name}</option>`
+                    ).join('');
+                } else {
+                    throw new Error("No models returned");
+                }
+
+                // 2. Graph Sources (from Stats)
+                const resStats = await fetch(API_URL + '/api/stats');
+                const stats = await resStats.json();
+                const graphDetails = stats.graph_details || [];
+
+                let sourceOptions = `<option value="all">All Sources</option>`;
+                if (graphDetails.length > 0) {
+                    sourceOptions += graphDetails.map(d =>
+                        `<option value="${d.model}">${d.model} (${d.count})</option>`
+                    ).join('');
+                }
+                graphSourceSelect.innerHTML = sourceOptions;
+
+            } catch (e) {
+                console.error("Failed to load models/stats", e);
+                modelSelect.innerHTML = `
+                    <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                    <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                `;
+            }
+        }
+
+        // --- UI Utils ---
+        function createMessageElement(isUser, content = '') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + (isUser ? 'user-message' : 'bot-message');
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content ' + (isUser ? 'user-content' : 'bot-content');
+
+            if (isUser) {
+                contentDiv.innerText = content;
+            } else {
+                contentDiv.innerHTML = content ? marked.parse(content) : '';
+            }
+
+            messageDiv.appendChild(contentDiv);
+            chatBox.appendChild(messageDiv);
+            scrollToBottom();
+            return contentDiv;
+        }
+
+        function createTypingIndicator() {
+            const div = document.createElement('div');
+            div.className = 'typing-indicator';
+            div.id = 'typing';
+            div.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+            chatBox.appendChild(div);
+            scrollToBottom();
+            return div;
+        }
+
+        function removeTypingIndicator() {
+            const el = document.getElementById('typing');
+            if (el) el.remove();
+        }
+
+        function scrollToBottom() {
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // --- API Logic ---
+        async function sendMessage() {
+            const query = input.value.trim();
+            if (!query) return;
+
+            // 1. 사용자 메시지
+            createMessageElement(true, query);
+            input.value = '';
+            input.disabled = true;
+            sendBtn.disabled = true;
+
+            // 2. 로딩
+            createTypingIndicator();
+
+            try {
+                // 3. API 요청
+                const response = await fetch(API_URL + '/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        question: query,
+                        session_id: SESSION_ID,
+                        model: modelSelect.value,
+                        rag_type: ragSelect.value,
+                        graph_source: graphSourceSelect.value
+                    })
+                });
+
+                removeTypingIndicator();
+
+                if (!response.ok) throw new Error('서버 응답 오류');
+
+                // 4. 스트리밍 응답 처리
+                const botContentDiv = createMessageElement(false);
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullText = "";
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    fullText += chunk;
+                    botContentDiv.innerHTML = marked.parse(fullText);
+                    scrollToBottom();
+                }
+            } catch (error) {
+                removeTypingIndicator();
+                console.error(error);
+                createMessageElement(false, `⚠️ 오류가 발생했습니다: ${error.message}`);
+            } finally {
+                input.disabled = false;
+                sendBtn.disabled = false;
+                input.focus();
+            }
+        }
+
+        // --- Status & Persona Check ---
+        async function checkServerAndPersona() {
+            const statusBadge = document.getElementById('server-status');
+            const statusText = document.getElementById('status-text');
+            const personaText = document.getElementById('active-persona-text');
+
+            try {
+                const healthRes = await fetch(API_URL + '/health', { signal: AbortSignal.timeout(2000) });
+                if (healthRes.ok) {
+                    statusBadge.className = 'status-badge online';
+                    statusText.innerText = 'Online';
+                } else throw new Error();
+
+                const personaRes = await fetch(API_URL + '/api/personas');
+                const personas = await personaRes.json();
+                const active = personas.find(p => p.active);
+
+                if (active) {
+                    personaText.innerHTML = `Current Mode: <strong style="color:var(--primary);">${active.name}</strong>`;
+                } else {
+                    personaText.innerText = "Current Mode: Default AI";
+                }
+
+            } catch (e) {
+                statusBadge.className = 'status-badge offline';
+                statusText.innerText = 'Offline';
+                personaText.innerText = "Disconnected";
+            }
+        }
+
+        // 초기화 실행
+        loadChatModels();
+        toggleGraphSource();
+        setInterval(checkServerAndPersona, 5000);
+        checkServerAndPersona();
+        initChat();
+    </script>
+</body>
+
+</html>
