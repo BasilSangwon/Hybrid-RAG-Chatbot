@@ -81,6 +81,14 @@ vector_store = PGVector(
 try:
     graph = Neo4jGraph(url=NEO4J_URI, username=NEO4J_USERNAME, password=NEO4J_PASSWORD)
     print("   ✅ Neo4j Graph Connected!")
+    
+    # [FIX] Register property keys to prevent 'UnknownPropertyKeyWarning' in empty DB
+    try:
+        print("   🔧 Registering graph property keys...")
+        graph.query("CREATE (n:_SchemaRegistration {source_model: 'init', source_file: 'init', experiment_id: 0}) DELETE n")
+    except Exception as e:
+        print(f"   ⚠️ Failed to register property keys: {e}")
+
 except Exception as e:
     print(f"   ⚠️ Neo4j Connection Failed: {e}")
     graph = None
@@ -612,26 +620,26 @@ async def chat_endpoint(req: ChatReq, db: Session = Depends(get_db)):
                     [Schema Info]
                     - Node Labels: `Product`, `Feature`, `Spec`, `Requirement`, `Component`, `UserManual`, `Section`
                     - Relationship Types: `HAS_FEATURE`, `HAS_SPEC`, `REQUIRES`, `INCLUDES`, `PART_OF`, `RELATED_TO`
-                    - Node Properties: `id` (text content), `source_model`
+                    - Node Properties: `name` (text content), `source_model`
                     
                     [CRITICAL INSTRUCTION]
                     1. Identify KEY ENTITIES from the question (e.g., '실시간 통역', '네트워크').
                     2. Map user intent to Schema:
                        - "Constraints", "Conditions", "Requirements", "제약", "조건" -> Look for `(:Requirement)` nodes or `[:REQUIRES]` relationships.
                        - "Features", "Functions" -> Look for `(:Feature)` nodes.
-                    3. Use `toLower(n.id) CONTAINS` for partial matching of entity names.
+                    3. Use `toLower(n.name) CONTAINS` for partial matching of entity names.
                     4. **CRITICAL**: You MUST start every MATCH clause with `MATCH path = ...` to define the `path` variable.
                     
                     [Query Logic Strategy]
                     // Strategy 1: Path between two specific keywords
                     MATCH (start), (end)
-                    WHERE toLower(start.id) CONTAINS 'keyword1' AND toLower(end.id) CONTAINS 'keyword2'
+                    WHERE toLower(start.name) CONTAINS 'keyword1' AND toLower(end.name) CONTAINS 'keyword2'
                     MATCH path = (start)-[*1..3]-(end)
                     RETURN path LIMIT 20
                     UNION
                     // Strategy 2: Neighbors of keywords
                     MATCH path = (n)-[r]-(m)
-                    WHERE (toLower(n.id) CONTAINS 'keyword1' OR toLower(n.id) CONTAINS 'keyword2')
+                    WHERE (toLower(n.name) CONTAINS 'keyword1' OR toLower(n.name) CONTAINS 'keyword2')
                     {filter_condition}
                     RETURN path LIMIT 50
                     
@@ -639,12 +647,12 @@ async def chat_endpoint(req: ChatReq, db: Session = Depends(get_db)):
                     Question: "실시간 통역의 제약 조건은?"
                     Cypher:
                     MATCH path = (n)-[:REQUIRES]-(m)
-                    WHERE toLower(n.id) CONTAINS '실시간'
+                    WHERE toLower(n.name) CONTAINS '실시간'
                     {filter_condition}
                     RETURN path LIMIT 20
                     UNION
                     MATCH path = (n)-[r]-(m)
-                    WHERE toLower(n.id) CONTAINS '실시간'
+                    WHERE toLower(n.name) CONTAINS '실시간'
                     {filter_condition}
                     RETURN path LIMIT 50
                     

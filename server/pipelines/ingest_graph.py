@@ -1,5 +1,7 @@
 import os
 import time
+import pymupdf4llm
+from langchain_core.documents import Document
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_neo4j import Neo4jGraph
@@ -34,11 +36,11 @@ def run_graph_ingest(model_name: str, experiment_id: int, chunk_size: int = 2000
         except Exception as e:
             print(f"   ⚠️ DB Clear Failed: {e}")
 
-    # 3. Prepare LLM (Dynamic Instantiation)
+    # 3. Prepare LLM (Dynamic Instantiation) - 사용자 선택 존중
     llm = None
     if "gemini" in model_name.lower():
         llm = ChatGoogleGenerativeAI(
-            model=model_name, 
+            model=model_name,  # 사용자가 선택한 모델 그대로 사용
             temperature=0,
             google_api_key=GOOGLE_API_KEY
         )
@@ -46,48 +48,32 @@ def run_graph_ingest(model_name: str, experiment_id: int, chunk_size: int = 2000
         # OpenAI 사용 시
         # llm = ChatOpenAI(model=model_name, temperature=0)
         print(f"   ⚠️ OpenAI model selected ({model_name}). Make sure API key is set.")
-        pass # 실제 구현 시 주석 해제
+        pass 
     else:
         print(f"   ⚠️ Unknown model '{model_name}', using default Gemini Flash.")
         llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0, google_api_key=GOOGLE_API_KEY)
     
     # ---------------------------------------------------------
-    # [핵심 수정] 스키마(Schema) 강제 정의 (Schema Enforcement)
+    # 스키마(Schema) 정의
     # ---------------------------------------------------------
-    # LLM이 '생성', 'WITH' 같은 쓸모없는 관계를 만들지 못하게 막고,
-    # 검색 프롬프트(main.py)와 일치하는 구조로만 데이터를 생성하게 합니다.
-    
     allowed_nodes = [
-        "Product",      # 제품 (Galaxy S25)
-        "Feature",      # 기능 (실시간 통역)
-        "Spec",         # 스펙 (4000mAh)
-        "Requirement",  # 필요조건 (네트워크, 계정)
-        "Constraint",   # [추가] '제약조건'을 명시적으로 추가
-        "Condition",    # [추가] '조건' 추가
-        "Component",    # 구성요소 (카메라, 배터리)
-        "UserManual",   # 매뉴얼 문서
-        "Section"       # 매뉴얼 섹션
+        "Product", "Feature", "Spec", 
+        "Requirement", "Constraint", "Condition", 
+        "Component", "UserManual", "Section"
     ]
     
     allowed_rels = [
-        "HAS_FEATURE",      # 제품 -> 기능
-        "HAS_SPEC",         # 제품 -> 스펙
-        "REQUIRES",         # 기능 -> 조건 (네트워크 등)
-        "HAS_CONSTRAINT",   # [추가] 기능 -> 제약조건
-        "HAS_CONDITION",    # [추가] 기능 -> 조건
-        "INCLUDES",         # 포함 관계
-        "PART_OF",          # 구성 관계
-        "RELATED_TO",       # 일반적인 관련성
-        "HAS_MANUAL",       # 제품 -> 매뉴얼
-        "HAS_SECTION"       # 매뉴얼 -> 섹션
+        "HAS_FEATURE", "HAS_SPEC", 
+        "REQUIRES", "HAS_CONSTRAINT", "HAS_CONDITION",
+        "INCLUDES", "PART_OF", "RELATED_TO", 
+        "HAS_MANUAL", "HAS_SECTION"
     ]
 
     llm_transformer = LLMGraphTransformer(
         llm=llm,
         allowed_nodes=allowed_nodes,
         allowed_relationships=allowed_rels,
-        # node_properties=["id"] # id 속성은 기본적으로 생성됨
-        node_properties=["id", "description"]
+        node_properties=["name", "description"]
     )
     # ---------------------------------------------------------
 
@@ -106,66 +92,74 @@ def run_graph_ingest(model_name: str, experiment_id: int, chunk_size: int = 2000
         print(f"\n📄 Processing '{filename}' using {model_name}... (Chunk: {chunk_size})")
         file_path = os.path.join(RAW_DATA_DIR, filename)
         
-        loader = PyMuPDFLoader(file_path)
-        raw_docs = loader.load()
+        # [NEW] PyMuPDF4LLM Markdown Conversion
+        try:
+            print("   📄 Converting PDF to Markdown using pymupdf4llm...")
+            md_text = pymupdf4llm.to_markdown(file_path)
+            # Wrap in Document object
+            raw_docs = [Document(page_content=md_text, metadata={"source": filename})]
+            print("   ✅ Markdown conversion successful.")
+        except Exception as e:
+            print(f"   ⚠️ Markdown conversion failed: {e}. Fallback to standard loader.")
+            loader = PyMuPDFLoader(file_path)
+            raw_docs = loader.load()
         
-        # Graph는 문맥 파악을 위해 Chunk Size를 넉넉하게 잡음
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=overlap)
         docs = text_splitter.split_documents(raw_docs)
         print(f"   -> {len(docs)} chunks created.")
 
         print("   ⏳ Extracting relationships & Tagging metadata...")
-        BATCH_SIZE = 1 # API Rate Limit 고려
+        BATCH_SIZE = 1 
         
         for i in range(0, len(docs), BATCH_SIZE):
             batch_docs = docs[i : i + BATCH_SIZE]
             try:
-                # (1) 그래프 문서 변환 (스키마에 맞춰 추출)
+                # (1) 그래프 문서 변환
                 graph_docs = llm_transformer.convert_to_graph_documents(batch_docs)
                 
-                # (2) 메타데이터 태깅 (모델명, 파일명)
-                # 추출된 노드/관계에 출처 정보를 강제로 주입합니다.
+                # (2) 메타데이터 태깅
                 for g_doc in graph_docs:
                     for node in g_doc.nodes:
                         node.properties['source_model'] = model_name
                         node.properties['source_file'] = filename
-                        if experiment_id:
+                        
+                        # [수정] 0번 ID도 저장되도록 조건 변경
+                        if experiment_id is not None:
                             node.properties['experiment_id'] = experiment_id
-                        # id가 없는 경우 대비 (보통은 LLMGraphTransformer가 채워줌)
-                        if 'id' not in node.properties:
-                            node.properties['id'] = node.id 
+                            
+                        if 'name' not in node.properties:
+                            node.properties['name'] = node.id 
+                        
+                        # [FIX] Remove 'id' property if it exists to avoid Neo4j reserved keyword error
+                        if 'id' in node.properties:
+                            del node.properties['id'] 
 
                     for rel in g_doc.relationships:
                         rel.properties['source_model'] = model_name
-                        if experiment_id:
+                        if experiment_id is not None:
                             rel.properties['experiment_id'] = experiment_id
                 
                 # (3) DB 저장
                 graph.add_graph_documents(graph_docs)
-                print(f"      📦 Batch {i//BATCH_SIZE + 1} saved.")
-                time.sleep(21) # 휴식 (Rate Limit 방지)
+                print(f"      📦 Batch {i//BATCH_SIZE + 1}/{len(docs)} saved.")
                 
             except Exception as e:
                 print(f"      ⚠️ Error in batch {i}: {e}")
+            
+            # [핵심 수정] 성공하든 실패하든 무조건 대기 (Rate Limit 방지)
+            # try-except 밖으로 빼서 에러 발생 시 연속 호출 방지
+            finally:
+                print("      ⏳ Waiting 21s...") 
+                time.sleep(21)
 
     print(f"\n🎉 [Success] Graph Ingestion Complete with [{model_name}]!")
 
-# --- [2] [NEW] 특정 모델 데이터 삭제 함수 ---
+# --- 삭제 함수는 기존 유지 ---
 def delete_graph_data(model_name: str):
-    """
-    선택한 모델(source_model)로 생성된 노드와 관계만 삭제합니다.
-    """
     print(f"\n🗑️  [Graph Delete] Removing data for model: [{model_name}]")
-    
     try:
         graph = Neo4jGraph(url=NEO4J_URI, username=NEO4J_USERNAME, password=NEO4J_PASSWORD)
-        
-        # 해당 모델 태그가 붙은 노드와 관계를 모두 삭제하는 Cypher 쿼리
-        query = f"""
-        MATCH (n)
-        WHERE n.source_model = '{model_name}'
-        DETACH DELETE n
-        """
+        query = f"MATCH (n) WHERE n.source_model = '{model_name}' DETACH DELETE n"
         graph.query(query)
         print(f"   ✅ Successfully deleted nodes/rels for '{model_name}'")
         return True
@@ -174,5 +168,4 @@ def delete_graph_data(model_name: str):
         return False
 
 if __name__ == "__main__":
-    # Test run
     run_graph_ingest(model_name="gemini-2.0-flash", experiment_id=0)
