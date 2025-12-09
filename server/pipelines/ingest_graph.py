@@ -78,9 +78,19 @@ def run_graph_ingest(model_name: str, experiment_id: int, chunk_size: int = 2000
     # ---------------------------------------------------------
 
     # 4. Load Files
-    if not os.path.exists(RAW_DATA_DIR):
-        print("   ❌ Data directory not found.")
-        return
+    # DB에 이미 저장된 파일 목록을 가져옵니다. (main.py의 stats API 활용 로직 등을 참고하거나 직접 쿼리)
+    try:
+        existing_files = [r['source_file'] for r in graph.query("MATCH (n) WHERE n.source_model = $model RETURN DISTINCT n.source_file as source_file", {"model": model_name})]
+    except:
+        existing_files = []
+
+    for filename in files:
+        # [핵심] 이미 학습한 파일이면 건너뜁니다! (토큰 절약)
+        if filename in existing_files:
+            print(f"⏩ Skipping '{filename}' (Already ingested)")
+            continue
+            
+        print(f"\n📄 Processing '{filename}'...")
 
     files = [f for f in os.listdir(RAW_DATA_DIR) if f.endswith('.pdf')]
     if not files:
