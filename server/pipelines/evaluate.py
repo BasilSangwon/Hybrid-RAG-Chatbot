@@ -3,6 +3,7 @@ import os
 import sys
 import json
 import random
+import time
 from sqlalchemy.orm import Session
 from langchain_postgres import PGVector
 from langchain_community.graphs import Neo4jGraph
@@ -42,12 +43,36 @@ except:
 def get_llm(model_name="gemini-2.0-flash"):
     return ChatGoogleGenerativeAI(model=model_name, temperature=0, google_api_key=GOOGLE_API_KEY)
 
+def safe_invoke(llm, prompt, retries=3, base_delay=10):
+    """
+    Invokes LLM with retry logic for rate limits.
+    Strictly NO fallback to other models.
+    """
+    for i in range(retries):
+        try:
+            return llm.invoke(prompt)
+        except Exception as e:
+            err_msg = str(e)
+            if "RESOURCE_EXHAUSTED" in err_msg or "429" in err_msg:
+                if i < retries - 1:
+                    wait_time = base_delay * (i + 1) + random.uniform(1, 3)
+                    print(f"⚠️ [Eval] Rate limit hit (429). Retrying in {wait_time:.1f}s... (Attempt {i+1}/{retries})")
+                    time.sleep(wait_time)
+                    continue
+            # If not 429 or retries exhausted, re-raise
+            raise e
+
 def calculate_metrics(question, answer, context, ground_truth=None, model_name="gemini-2.0-flash"):
     """
     Uses LLM to calculate Faithfulness, Answer Relevancy, and Context Precision.
     Returns a dict with scores.
     """
     llm = get_llm(model_name)
+    
+    # 1. Faithfulness
+    # [Delay to prevent burst]
+    time.sleep(2) 
+    
     faith_prompt = f"""
     You are a judge. Evaluate if the ANSWER is derived ONLY from the CONTEXT.
     
@@ -61,10 +86,13 @@ def calculate_metrics(question, answer, context, ground_truth=None, model_name="
     Return ONLY the number.
     """
     try:
-        faith_score = float(llm.invoke(faith_prompt).content.strip())
+        res = safe_invoke(llm, faith_prompt)
+        faith_score = float(res.content.strip())
     except: faith_score = 0.5
 
-    # 2. Answer Relevancy: Is the answer relevant to the question?
+    # 2. Answer Relevancy
+    time.sleep(2)
+    
     rel_prompt = f"""
     You are a judge. Evaluate if the ANSWER is relevant to the QUESTION.
     
@@ -78,10 +106,13 @@ def calculate_metrics(question, answer, context, ground_truth=None, model_name="
     Return ONLY the number.
     """
     try:
-        rel_score = float(llm.invoke(rel_prompt).content.strip())
+        res = safe_invoke(llm, rel_prompt)
+        rel_score = float(res.content.strip())
     except: rel_score = 0.5
 
-    # 3. Context Precision: Is the context relevant to the ground truth (if available) or question?
+    # 3. Context Precision
+    time.sleep(2)
+
     # If ground_truth is provided, check if context contains it.
     prec_prompt = f"""
     You are a judge. Evaluate if the CONTEXT contains the information needed to answer the QUESTION.
@@ -96,7 +127,8 @@ def calculate_metrics(question, answer, context, ground_truth=None, model_name="
     Return ONLY the number.
     """
     try:
-        prec_score = float(llm.invoke(prec_prompt).content.strip())
+        res = safe_invoke(llm, prec_prompt)
+        prec_score = float(res.content.strip())
     except: prec_score = 0.5
 
     return {
@@ -105,7 +137,7 @@ def calculate_metrics(question, answer, context, ground_truth=None, model_name="
         "context_precision": prec_score
     }
 
-def run_rag_generation(question):
+def run_rag_generation(question, model_name="gemini-2.0-flash"):
     """
     Simulates the RAG pipeline to generate an answer.
     """
@@ -154,7 +186,10 @@ def run_rag_generation(question):
     [Question]
     {question}
     """
-    response = llm.invoke(final_prompt).content
+    llm = get_llm(model_name)
+    # Use safe_invoke
+    res = safe_invoke(llm, final_prompt)
+    response = res.content
     return response, vector_context + "\n" + graph_context
 
 def run_evaluation(limit=5, model_name="gemini-2.0-flash"):
@@ -162,7 +197,6 @@ def run_evaluation(limit=5, model_name="gemini-2.0-flash"):
     Main evaluation function.
     """
     session = SessionLocal()
-    llm = get_llm(model_name) # Used for generation if needed
     try:
         # Get Golden Data
         answers = session.query(CorrectAnswer).order_by(CorrectAnswer.id.desc()).limit(limit).all()
@@ -175,28 +209,43 @@ def run_evaluation(limit=5, model_name="gemini-2.0-flash"):
         total_prec = 0
         details = []
 
-        for a in answers:
-            # Generate RAG Answer (Note: run_rag_generation needs to use the same LLM logic if we want to test generation too, but for now we might focus on Eval)
-            # Ideally run_rag_generation should also accept model_name
-            gen_answer, context = run_rag_generation(a.question)
-            
-            # Calculate Metrics
-            metrics = calculate_metrics(a.question, gen_answer, context, ground_truth=a.answer, model_name=model_name)
-            
-            total_faith += metrics['faithfulness']
-            total_rel += metrics['answer_relevancy']
-            total_prec += metrics['context_precision']
-            
-            details.append({
-                "question": a.question,
-                "answer": gen_answer, # Show generated answer
-                "ground_truth": a.answer,
-                "faithfulness": metrics['faithfulness'],
-                "relevancy": metrics['answer_relevancy'],
-                "precision": metrics['context_precision']
-            })
+        print(f"📊 Starting Evaluation using {model_name} (Limit: {limit})")
 
-        count = len(answers)
+        for i, a in enumerate(answers):
+            print(f"   [{i+1}/{len(answers)}] Evaluating Q: {a.question[:30]}...")
+            
+            # Generate RAG Answer
+            try:
+                gen_answer, context = run_rag_generation(a.question, model_name=model_name)
+                
+                # Calculate Metrics
+                metrics = calculate_metrics(a.question, gen_answer, context, ground_truth=a.answer, model_name=model_name)
+                
+                total_faith += metrics['faithfulness']
+                total_rel += metrics['answer_relevancy']
+                total_prec += metrics['context_precision']
+                
+                details.append({
+                    "question": a.question,
+                    "answer": gen_answer, # Show generated answer
+                    "ground_truth": a.answer,
+                    "faithfulness": metrics['faithfulness'],
+                    "relevancy": metrics['answer_relevancy'],
+                    "precision": metrics['context_precision']
+                })
+
+                # [Rate Limit] Cooldown between items
+                time.sleep(5) 
+                
+            except Exception as item_error:
+                print(f"   ⚠️ Error processing item {a.id}: {item_error}")
+                # Don't break the whole loop, just skip this item? Or fail? 
+                # User hates errors, so let's fail gracefully or logging it.
+
+        count = len(details)
+        if count == 0:
+             return {"status": "error", "message": "Evaluation failed for all items."}
+
         return {
             "status": "ok",
             "result": {

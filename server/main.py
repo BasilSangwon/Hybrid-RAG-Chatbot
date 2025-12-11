@@ -7,7 +7,7 @@ import google.generativeai as genai  # [필수] pip install google-generativeai
 # 경고 숨기기
 warnings.filterwarnings("ignore")
 
-from fastapi import FastAPI, UploadFile, File, Depends, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Depends, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware

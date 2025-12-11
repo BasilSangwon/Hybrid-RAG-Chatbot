@@ -2,15 +2,21 @@
 
 async function generateAIQA() {
     const file = document.getElementById('qa_source_file').value;
+    const modelSelect = document.getElementById('shared_model_select');
+    const selectedModel = modelSelect ? modelSelect.value : "gemini-2.0-flash";
+
     if (!file) return alert("분석할 PDF 파일을 선택해주세요.");
 
-    if (!confirm(`'${file}' 파일을 분석하여 QA 데이터셋을 자동 생성하시겠습니까? (시간이 소요됩니다)`)) return;
+    if (!confirm(`'${file}' 파일을 분석하여 QA 데이터셋을 자동 생성하시겠습니까?\n(선택된 모델: ${selectedModel})`)) return;
 
     try {
         const res = await fetch(API + '/api/generate_qa', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename: file })
+            body: JSON.stringify({
+                filename: file,
+                model: selectedModel
+            })
         });
         const data = await res.json();
         alert(data.message);
