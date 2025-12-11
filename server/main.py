@@ -97,6 +97,7 @@ app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 # --- Static Files ---
+app.mount("/js", StaticFiles(directory=os.path.join(os.path.dirname(current_dir), "client", "js")), name="js")
 # app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(current_dir), "client", "static")), name="static")
 
 # --- Job Status Management ---
