@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage
@@ -9,28 +10,32 @@ from server.core.config import RAW_DATA_DIR, GOOGLE_API_KEY
 from server.core.database import engine
 from server.services.embedder import get_bge_m3_embedding
 
-def generate_bulk_qa():
-    print("🤖 [Auto QA] Generating Q&A from PDFs...")
+def generate_bulk_qa(filename=None, model_name="gemini-2.0-flash"):
+    print(f"🤖 [Auto QA] Generating Q&A from PDFs using {model_name}...")
     
     # 1. Prepare Components
     embeddings = get_bge_m3_embedding()
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
+        model=model_name,
         temperature=0.7,
         google_api_key=GOOGLE_API_KEY
     )
 
     # 2. Check Files
-    files = [f for f in os.listdir(RAW_DATA_DIR) if f.endswith('.pdf')]
-    if not files:
+    if filename:
+        target_files = [filename]
+    else:
+        target_files = [f for f in os.listdir(RAW_DATA_DIR) if f.endswith('.pdf')]
+        
+    if not target_files:
         print("❌ No PDF files found.")
         return
 
     total_added = 0
 
-    for filename in files:
-        print(f"\n📄 Analyzing '{filename}'...")
-        file_path = os.path.join(RAW_DATA_DIR, filename)
+    for fname in target_files:
+        print(f"\n📄 Analyzing '{fname}'...")
+        file_path = os.path.join(RAW_DATA_DIR, fname)
         
         loader = PyMuPDFLoader(file_path)
         docs = loader.load()
@@ -46,23 +51,47 @@ def generate_bulk_qa():
         {context}
 
         [Rules]
-        1. Diverse questions (How-to, Troubleshooting, Specs).
-        2. Answers based on the manual.
-        3. Output strictly in JSON list format.
+        1. **Analyze the language of the manual completely.** (Most likely Korean)
+        2. Generate questions and answers in the **SAME language** as the manual.
+        3. Diverse questions (How-to, Troubleshooting, Specs).
+        4. Answers based on the manual.
+        5. Output strictly in JSON list format.
 
         [Example]
         [
-            {{"q": "How to replace battery?", "a": "Open back cover..."}},
-            {{"q": "Reset method", "a": "Settings > General > Reset"}}
+            {{"q": "배터리 교체 방법이 무엇인가요?", "a": "후면 커버를 열고..."}},
+            {{"q": "초기화 방법", "a": "설정 > 일반 > 초기화 메뉴 진입"}}
         ]
         """
 
+        # [NEW] Rate Limiting Sleep (Base 15s)
+        if total_added >= 0: 
+            print("   💤 Cooling down for API rate limit (15s)...")
+            time.sleep(15)
+
         try:
-            msg = [HumanMessage(content=prompt)]
-            res = llm.invoke(msg).content
+             # [NEW] Simple Retry Logic
+            qa_list = []
+            max_retries = 3
             
-            clean_json = res.replace("```json", "").replace("```", "").strip()
-            qa_list = json.loads(clean_json)
+            for attempt in range(max_retries):
+                try:
+                    msg = [HumanMessage(content=prompt)]
+                    res = llm.invoke(msg).content
+                    
+                    clean_json = res.replace("```json", "").replace("```", "").strip()
+                    qa_list = json.loads(clean_json)
+                    break # Success
+                except Exception as e:
+                    if "429" in str(e) or "RESOURCE" in str(e):
+                        wait_time = (attempt + 1) * 30 
+                        print(f"   ⚠️ Rate limit hit. Waiting {wait_time}s before retry ({attempt+1}/{max_retries})...")
+                        time.sleep(wait_time)
+                    else:
+                        raise e 
+            else:
+                 print(f"   ❌ Failed after {max_retries} retries for {filename}.")
+                 continue
 
             # 4. Save to DB
             with engine.connect() as conn:

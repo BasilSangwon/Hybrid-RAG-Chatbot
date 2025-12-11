@@ -125,10 +125,20 @@ def background_ingest_task(type: str, exp_id: int, config: dict, collection_name
         print(f"Ingest Error ({type}): {e}")
     finally:
         JOB_STATUS[type] = "idle"
+class QAGenRequest(BaseModel):
+    filename: str
+    model: str = "gemini-2.0-flash"
+
 @app.post("/api/generate_qa")
-async def generate_qa_endpoint(background_tasks: BackgroundTasks):
-    background_tasks.add_task(generate_bulk_qa)
-    return {"status": "ok", "message": "Background QA generation started."}
+async def generate_qa_endpoint(req: QAGenRequest, background_tasks: BackgroundTasks):
+    from server.pipelines.qa_gen import generate_bulk_qa
+    # Pass model to the pipeline
+    background_tasks.add_task(generate_bulk_qa, filename=req.filename, model_name=req.model)
+    return {"status": "ok", "message": f"Background QA generation started using {req.model}."}
+
+class EvaluationRequest(BaseModel):
+    limit: int = 5
+    model: str = "gemini-2.0-flash"
 
 @app.post("/api/ingest")
 async def run_ingest(req: IngestReq, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
@@ -276,6 +286,7 @@ async def upload_file(file: UploadFile = File(...)):
 
 @app.get("/api/answers")
 def get_answers(db: Session = Depends(get_db)):
+    # [UPDATED] Sort by ID descending as requested
     return db.query(CorrectAnswer).order_by(CorrectAnswer.id.desc()).all()
 
 @app.post("/api/answers")
@@ -309,26 +320,33 @@ def delete_feedback(id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "ok"}
 
+# [UPDATED] Dynamic Model List
 @app.get("/api/models")
 def get_models():
+    """
+    Fetch all Gemini models that support generateContent.
+    """
     try:
         models = []
         for m in genai.list_models():
             if 'generateContent' in m.supported_generation_methods:
                 name = m.name.replace("models/", "")
-                
-                # [추가] 'tts'나 'audio'가 포함된 모델은 제외 (텍스트 전용 작업이므로)
-                if "tts" in name.lower() or "audio" in name.lower():
-                    continue
-
-                models.append({
-                    "id": name,
-                    "display_name": name
-                })
+                # Exclude vision/audio/legacy/beta if needed, but user asked for "ALL"
+                # We'll filter out non-gemini or very old ones if desired, but let's keep it broad for now.
+                if "gemini" in name: 
+                    models.append({
+                        "id": name,
+                        "display_name": name
+                    })
         return models
     except Exception as e:
         print(f"Error fetching models: {e}")
-        return [{"id": model, "display_name": model} for model in PRICING_MAP.keys()]
+        # Fallback list (Only 2.0+)
+        return [
+            {"id": "gemini-2.0-flash", "display_name": "gemini-2.0-flash"},
+            {"id": "gemini-2.0-flash-exp", "display_name": "gemini-2.0-flash-exp"},
+            {"id": "gemini-2.5-computer-use-preview-10-2025", "display_name": "gemini-2.5-preview"}
+        ]
 
 @app.get("/api/stats")
 def get_stats(db: Session = Depends(get_db)):
@@ -538,14 +556,19 @@ def get_usage(limit: int = 50, db: Session = Depends(get_db)):
 
 
 @app.post("/api/evaluate")
-def evaluate():
+async def api_evaluate(req: EvaluationRequest):
+    """
+    Run RAGAS evaluation on recent X items.
+    """
     try:
         from pipelines.evaluate import run_evaluation
-        # Run evaluation (synchronous for now, limit to 5 for speed)
-        result = run_evaluation(limit=5)
-        return result
+        # Pass the selected model to the evaluation function
+        results = run_evaluation(limit=req.limit, model_name=req.model)
+        if results["status"] == "error":
+            raise HTTPException(status_code=500, detail=results["message"])
+        return results
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- [UPDATED] Hybrid Chat Endpoint ---
 @app.post("/chat")
@@ -561,7 +584,7 @@ async def chat_endpoint(req: ChatReq, db: Session = Depends(get_db)):
         )
     except Exception as e:
         print(f"Model Init Error: {e}, fallback to default.")
-        chat_llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0, google_api_key=GOOGLE_API_KEY)
+        chat_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0, google_api_key=GOOGLE_API_KEY)
 
     # Active Persona Check
     active_persona = db.query(Persona).filter(Persona.active == True).first()

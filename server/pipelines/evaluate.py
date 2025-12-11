@@ -36,14 +36,18 @@ try:
 except:
     graph = None
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0, google_api_key=GOOGLE_API_KEY)
+# Removed global llm init to allow dynamic selection
+# llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0, google_api_key=GOOGLE_API_KEY)
 
-def calculate_metrics(question, answer, context, ground_truth=None):
+def get_llm(model_name="gemini-2.0-flash"):
+    return ChatGoogleGenerativeAI(model=model_name, temperature=0, google_api_key=GOOGLE_API_KEY)
+
+def calculate_metrics(question, answer, context, ground_truth=None, model_name="gemini-2.0-flash"):
     """
     Uses LLM to calculate Faithfulness, Answer Relevancy, and Context Precision.
     Returns a dict with scores.
     """
-    # 1. Faithfulness: Is the answer derived from context?
+    llm = get_llm(model_name)
     faith_prompt = f"""
     You are a judge. Evaluate if the ANSWER is derived ONLY from the CONTEXT.
     
@@ -153,11 +157,12 @@ def run_rag_generation(question):
     response = llm.invoke(final_prompt).content
     return response, vector_context + "\n" + graph_context
 
-def run_evaluation(limit=5):
+def run_evaluation(limit=5, model_name="gemini-2.0-flash"):
     """
     Main evaluation function.
     """
     session = SessionLocal()
+    llm = get_llm(model_name) # Used for generation if needed
     try:
         # Get Golden Data
         answers = session.query(CorrectAnswer).order_by(CorrectAnswer.id.desc()).limit(limit).all()
@@ -171,11 +176,12 @@ def run_evaluation(limit=5):
         details = []
 
         for a in answers:
-            # Generate RAG Answer
+            # Generate RAG Answer (Note: run_rag_generation needs to use the same LLM logic if we want to test generation too, but for now we might focus on Eval)
+            # Ideally run_rag_generation should also accept model_name
             gen_answer, context = run_rag_generation(a.question)
             
             # Calculate Metrics
-            metrics = calculate_metrics(a.question, gen_answer, context, ground_truth=a.answer)
+            metrics = calculate_metrics(a.question, gen_answer, context, ground_truth=a.answer, model_name=model_name)
             
             total_faith += metrics['faithfulness']
             total_rel += metrics['answer_relevancy']

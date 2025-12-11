@@ -113,6 +113,61 @@ async function runGraphIndex() {
     alert("백그라운드에서 Graph 실험이 시작되었습니다.");
 }
 
+// function loadAvailableModels() has been moved to evaluation.js to centralize model loading logic.
+
+// Call on load
+// Event listener moved to evaluation.js
+
+
+async function generateAIQA() {
+    const fileSelect = document.getElementById("qa_source_file");
+    const modelSelect = document.getElementById("shared_model_select"); // [NEW] Shared Selector
+    const filename = fileSelect.value;
+    const model = modelSelect ? modelSelect.value : "gemini-2.0-flash";
+    const btn = document.querySelector("button[onclick='generateAIQA()']");
+
+    if (!filename) {
+        alert("QA를 생성할 PDF 파일을 선택해주세요.");
+        return;
+    }
+
+    if (!confirm(`'${filename}' 문서를 분석하여 Q&A를 자동 생성하시겠습니까?\n모델: ${model}\n(약 1~2분 소요될 수 있습니다)`)) return;
+
+    // Loading State
+    const originalText = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = "⏳ 생성 중 (Generating)...";
+
+    try {
+        const res = await fetch("/api/generate-qa", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                filename: filename,
+                model: model // [NEW] Pass model
+            })
+        });
+
+        const data = await res.json();
+        if (data.status === "ok") {
+            alert(`✅ 생성 완료! 총 ${data.count}개의 질문이 추가되었습니다.`);
+            // [NEW] Auto Refresh
+            loadQAList();
+        } else {
+            alert("Error: " + data.message);
+        }
+    } catch (e) {
+        console.error(e);
+        alert("요청 중 오류가 발생했습니다.");
+    } finally {
+        // Restore Button
+        btn.disabled = false;
+        btn.innerText = originalText;
+    }
+}
+
 async function deleteGraphModel() {
     alert("기능 준비 중입니다. 위의 모델별 삭제 버튼을 이용해주세요.");
 }
@@ -131,34 +186,7 @@ async function deleteGraphModelData(modelName) {
     } catch (e) { alert("오류: " + e); }
 }
 
-async function loadModels() {
-    const sel = document.getElementById('graph_llm_select');
-    try {
-        const res = await fetch(API + '/api/models');
-        const models = await res.json();
-        const groups = { "Gemini 3 Series": [], "Gemini 2.5 Series": [], "Gemini 2.0 Series": [], "Gemini 1.5 Series": [], "Others": [] };
-
-        models.forEach(m => {
-            const name = m.id;
-            if (name.includes("gemini-3")) groups["Gemini 3 Series"].push(m);
-            else if (name.includes("gemini-2.5")) groups["Gemini 2.5 Series"].push(m);
-            else if (name.includes("gemini-2.0")) groups["Gemini 2.0 Series"].push(m);
-            else if (name.includes("gemini-1.5")) groups["Gemini 1.5 Series"].push(m);
-            else groups["Others"].push(m);
-        });
-
-        let html = "";
-        for (const [label, list] of Object.entries(groups)) {
-            if (list.length > 0) {
-                html += `<optgroup label="${label}">` + list.map(m => `<option value="${m.id}">${m.display_name}</option>`).join('') + `</optgroup>`;
-            }
-        }
-        sel.innerHTML = html;
-        checkGraphModelStatus();
-    } catch (e) {
-        sel.innerHTML = '<option value="gemini-2.0-flash">Gemini 2.0 Flash (Fallback)</option>';
-    }
-}
+// function loadModels() removed - consolidated into loadAvailableModels
 
 function checkGraphModelStatus() {
     const sel = document.getElementById('graph_llm_select');

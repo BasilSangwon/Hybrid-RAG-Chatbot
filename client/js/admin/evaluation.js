@@ -64,17 +64,27 @@ async function deleteAnswer(id) {
 }
 
 async function runEvaluation() {
-    document.getElementById('btnEval').disabled = true;
-    document.getElementById('btnEval').innerText = "⏳ 평가 진행 중...";
+    const btn = document.getElementById("btnEval");
+    const resultDiv = document.getElementById("evalResult");
+    const detailsDiv = document.getElementById("evalDetails");
+    const modelSelect = document.getElementById("shared_model_select"); // [NEW] Shared Selector
+    const selectedModel = modelSelect ? modelSelect.value : "gemini-2.0-flash";
+
+    btn.disabled = true;
+    btn.innerText = "⏳ 평가 진행 중...";
     try {
-        const res = await fetch(API + '/api/evaluate', { method: 'POST' });
+        const res = await fetch(API + '/api/evaluate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: selectedModel })
+        });
         const data = await res.json();
         const r = data.result;
-        document.getElementById('evalResult').style.display = 'block';
+        resultDiv.style.display = 'block';
         document.getElementById('score_faith').innerText = r.faithfulness;
         document.getElementById('score_rel').innerText = r.answer_relevancy;
         document.getElementById('score_prec').innerText = r.context_precision;
-        document.getElementById('evalDetails').innerHTML = r.details.map(d => `
+        detailsDiv.innerHTML = r.details.map(d => `
             <div style="margin-bottom:8px; font-size:12px;">
                 <strong>Q: ${d.question}</strong><br>
                 A: ${d.answer}<br>
@@ -85,3 +95,88 @@ async function runEvaluation() {
     document.getElementById('btnEval').disabled = false;
     document.getElementById('btnEval').innerText = "📝 평가 시작 (Start Evaluation)";
 }
+
+// [NEW] Shared Model Loading Logic (Moved from knowledge.js)
+async function loadAvailableModels() {
+    const selectors = [
+        document.getElementById("shared_model_select"),
+        document.getElementById("graph_llm_select")
+    ];
+
+    console.log("🔄 Loading models...");
+
+    // Fallback Options (Explicitly NO 1.5, Ensure 2.0+ exists)
+    const fallbackOptions = `
+        <optgroup label="Recommended">
+            <option value="gemini-2.0-flash" selected>gemini-2.0-flash</option>
+            <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp</option>
+            <option value="gemini-2.5-computer-use-preview-10-2025">gemini-2.5-preview</option>
+        </optgroup>
+    `;
+
+    try {
+        const res = await fetch("/api/models");
+
+        let models = [];
+        if (res.ok) {
+            models = await res.json();
+            console.log("✅ Models loaded:", models);
+        } else {
+            console.warn("⚠️ API Failure, using fallback options.");
+        }
+
+        // Filter and Build HTML
+        const groups = { "Gemini 2.0+ Series": [], "Others": [] };
+        let hasModels = false;
+
+        if (models && models.length > 0) {
+            models.forEach(m => {
+                const name = m.id;
+                // Exclude 1.5/1.0
+                if (name.includes("gemini-1.5") || name.includes("gemini-1.0")) return;
+
+                if (name.includes("gemini-2.0") || name.includes("gemini-2.5")) {
+                    groups["Gemini 2.0+ Series"].push(m);
+                    hasModels = true;
+                } else {
+                    groups["Others"].push(m);
+                    hasModels = true;
+                }
+            });
+        }
+
+        let html = "";
+        for (const [label, list] of Object.entries(groups)) {
+            if (list.length > 0) {
+                html += `<optgroup label="${label}">` + list.map(m => `<option value="${m.id}">${m.display_name}</option>`).join('') + `</optgroup>`;
+            }
+        }
+
+        // Use fallback if empty or API failed
+        if (!hasModels || !html) {
+            console.warn("⚠️ No relevant models found or API failed, using fallback.");
+            html = fallbackOptions;
+        }
+
+        selectors.forEach(sel => {
+            if (sel) {
+                sel.innerHTML = html;
+                // Set default
+                if (sel.querySelector("option[value='gemini-2.0-flash']")) {
+                    sel.value = "gemini-2.0-flash";
+                }
+            }
+        });
+
+    } catch (e) {
+        console.error("❌ Failed to load models:", e);
+        selectors.forEach(sel => {
+            if (sel) sel.innerHTML = fallbackOptions;
+        });
+    }
+}
+
+// Ensure it runs
+document.addEventListener("DOMContentLoaded", () => {
+    loadAvailableModels();
+});
