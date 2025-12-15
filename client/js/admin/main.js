@@ -3,8 +3,14 @@
 async function checkServerStatus() {
     const statusBadge = document.getElementById('server-status');
     const statusText = document.getElementById('status-text');
+
+    // AbortController for older browser compatibility
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
     try {
-        const res = await fetch(API + '/api/personas', { method: 'GET', signal: AbortSignal.timeout(2000) });
+        const res = await fetch(API + '/api/personas', { method: 'GET', signal: controller.signal });
+        clearTimeout(timeoutId);
         if (res.ok) {
             if (!isServerOnline) {
                 if (statusBadge) statusBadge.className = 'status-badge online';
@@ -14,6 +20,7 @@ async function checkServerStatus() {
             }
         } else throw new Error();
     } catch (e) {
+        clearTimeout(timeoutId);
         if (isServerOnline || (statusText && statusText.innerText.includes("시도 중"))) {
             if (statusBadge) statusBadge.className = 'status-badge offline';
             if (statusText) statusText.innerText = "연결 끊김 (Offline)";
@@ -69,7 +76,7 @@ function refreshAllData() {
     loadFeedback();
     loadFileOptions();
     loadDBStats();
-    loadModels();
+    loadAvailableModels();
     loadUsageStats();
     loadExperiments();
 }
