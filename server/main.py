@@ -304,6 +304,12 @@ def delete_answer(id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "ok"}
 
+@app.delete("/api/answers_all")
+def delete_all_answers(db: Session = Depends(get_db)):
+    count = db.query(CorrectAnswer).delete()
+    db.commit()
+    return {"status": "ok", "message": f"{count}개 항목 삭제됨"}
+
 @app.get("/api/feedback")
 def get_feedback(db: Session = Depends(get_db)):
     return db.query(Feedback).all()

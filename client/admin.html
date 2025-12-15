@@ -654,10 +654,15 @@
 
                 <!-- Part C: Management Table -->
                 <div class="sub-card">
-                    <h3 style="margin-top:0; font-size:15px; color:#475569; display:flex; align-items:center; gap:6px;">
+                    <h3
+                        style="margin-top:0; font-size:15px; color:#475569; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                         <span>📋</span> 등록된 지식 목록 (Knowledge Base)
-                        <button onclick="loadQAList()" style="margin-left:auto; font-size:12px; padding:4px 8px;"
-                            class="btn btn-sm">🔄 새로고침</button>
+                        <div style="margin-left:auto; display:flex; gap:5px; align-items:center;">
+                            <input type="text" id="qa_search" placeholder="검색..." onkeyup="filterAnswers()"
+                                style="width:120px; font-size:12px; padding:4px 8px;">
+                            <button onclick="loadAnswers()" class="btn btn-sm">🔄</button>
+                            <button onclick="deleteAllAnswers()" class="btn btn-sm btn-danger">🗑️ 전체삭제</button>
+                        </div>
                     </h3>
                     <div
                         style="overflow-x:auto; max-height: 250px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">

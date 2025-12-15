@@ -25,33 +25,52 @@ async function generateAIQA() {
     }
 }
 
+let allAnswersData = [];
+
 async function loadAnswers() {
     try {
         const res = await fetch(API + '/api/answers');
-        const data = await res.json();
-        const tbody = document.querySelector('#qaTable tbody');
-        if (!tbody) return;
-        if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#94a3b8;">데이터가 없습니다.</td></tr>';
-            return;
-        }
-        tbody.innerHTML = data.map(a => `
-            <tr>
-                <td style="text-align:center; color:#64748b;">${a.id}</td>
-                <td style="font-weight:600;">${a.question}</td>
-                <td style="color:#475569;">${a.answer}</td>
-                <td style="text-align:center;">
-                    <button onclick="deleteAnswer(${a.id})" class="btn btn-sm btn-danger">삭제</button>
-                </td>
-            </tr>
-        `).join('');
-    } catch (e) { }
+        allAnswersData = await res.json();
+        renderAnswers(allAnswersData);
+    } catch (e) { console.error("Load Answers Error", e); }
+}
+
+function renderAnswers(data) {
+    const tbody = document.querySelector('#qaTable tbody');
+    if (!tbody) return;
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#94a3b8;">데이터가 없습니다.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = data.map(a => `
+        <tr>
+            <td style="text-align:center; color:#64748b;">${a.id}</td>
+            <td style="font-weight:600;">${a.question}</td>
+            <td style="color:#475569;">${a.answer}</td>
+            <td style="text-align:center;">
+                <button onclick="deleteAnswer(${a.id})" class="btn btn-sm btn-danger">삭제</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function filterAnswers() {
+    const query = document.getElementById('qa_search').value.toLowerCase();
+    if (!query) {
+        renderAnswers(allAnswersData);
+        return;
+    }
+    const filtered = allAnswersData.filter(a =>
+        a.question.toLowerCase().includes(query) ||
+        a.answer.toLowerCase().includes(query)
+    );
+    renderAnswers(filtered);
 }
 
 async function addAnswer() {
     const q = document.getElementById('q_input').value;
     const a = document.getElementById('a_input').value;
-    if (!q || !a) return;
+    if (!q || !a) return alert("질문과 답변을 입력하세요.");
     await fetch(API + '/api/answers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,8 +82,17 @@ async function addAnswer() {
 }
 
 async function deleteAnswer(id) {
-    if (confirm("이 질문/답변을 삭제하시겠습니까?")) {
+    if (confirm("삭제하시겠습니까?")) {
         await fetch(API + `/api/answers/${id}`, { method: 'DELETE' });
+        loadAnswers();
+    }
+}
+
+async function deleteAllAnswers() {
+    if (confirm("⚠️ 모든 지식 데이터를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다!")) {
+        const res = await fetch(API + '/api/answers_all', { method: 'DELETE' });
+        const data = await res.json();
+        alert(data.message || "삭제 완료");
         loadAnswers();
     }
 }
