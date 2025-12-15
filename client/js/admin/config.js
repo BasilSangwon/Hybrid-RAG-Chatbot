@@ -5,5 +5,6 @@ let isServerOnline = false;
 let learnedModels = [];
 let lastVectorStatus = 'idle';
 let lastGraphStatus = 'idle';
+let lastQAGenStatus = 'idle';
 let vectorChartInstance = null;
 let graphChartInstance = null;

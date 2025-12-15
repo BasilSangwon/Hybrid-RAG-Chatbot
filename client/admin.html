@@ -621,14 +621,31 @@
 
                         <div class="form-group">
                             <label class="form-label">대상 PDF 파일</label>
-                            <select id="qa_source_file" style="margin-bottom:10px;">
+                            <select id="qa_source_file" style="margin-bottom:10px;" onchange="updateFileInfo()">
                                 <option value="">파일 선택...</option>
                             </select>
                         </div>
-                        <button onclick="generateAIQA()" class="btn btn-full"
-                            style="background:#2563eb; box-shadow:0 4px 6px -1px rgba(37, 99, 235, 0.2);">
-                            ⚡ Q&A 자동 생성 시작
-                        </button>
+                        <div class="form-group" style="margin-bottom:12px;">
+                            <label class="form-label">생성 개수</label>
+                            <input type="number" id="qa_count" value="10" min="1" max="50" style="width:80px;"
+                                onchange="updateFileInfo()" oninput="updateFileInfo()">
+                            <div id="qa_token_info"
+                                style="margin-top:8px; padding:10px; background:#e0f2fe; border-radius:6px; font-size:11px; color:#0369a1;">
+                                💡 파일을 선택하면 예상 토큰이 표시됩니다.
+                            </div>
+                        </div>
+                        <div id="qa_gen_buttons">
+                            <button id="btnQAGen" onclick="generateAIQA()" class="btn btn-full"
+                                style="background:#2563eb; box-shadow:0 4px 6px -1px rgba(37, 99, 235, 0.2);">
+                                ⚡ Q&A 자동 생성 시작
+                            </button>
+                        </div>
+                        <div id="qa_gen_progress" style="display:none; text-align:center; padding:10px;">
+                            <div style="color:#2563eb; font-weight:600;">⏳ Q&A 생성 중...</div>
+                            <button onclick="cancelQAGen()" class="btn btn-sm btn-danger" style="margin-top:8px;">
+                                ❌ 작업 취소
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Part B: Manual Entry -->

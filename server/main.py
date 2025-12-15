@@ -101,7 +101,9 @@ app.mount("/js", StaticFiles(directory=os.path.join(os.path.dirname(current_dir)
 # app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(current_dir), "client", "static")), name="static")
 
 # --- Job Status Management ---
-JOB_STATUS = {"vector": "idle", "graph": "idle"}
+import threading
+JOB_STATUS = {"vector": "idle", "graph": "idle", "qa_gen": "idle"}
+QA_GEN_CANCEL_EVENT = threading.Event()  # Thread-safe cancel event
 
 @app.get("/api/job_status")
 def get_job_status():
@@ -128,13 +130,42 @@ def background_ingest_task(type: str, exp_id: int, config: dict, collection_name
 class QAGenRequest(BaseModel):
     filename: str
     model: str = "gemini-2.0-flash"
+    count: int = 10
 
 @app.post("/api/generate_qa")
 async def generate_qa_endpoint(req: QAGenRequest, background_tasks: BackgroundTasks):
+    global JOB_STATUS
+    if JOB_STATUS["qa_gen"] == "running":
+        return {"status": "error", "message": "Q&A 생성이 이미 진행 중입니다."}
+    
     from server.pipelines.qa_gen import generate_bulk_qa
-    # Pass model to the pipeline
-    background_tasks.add_task(generate_bulk_qa, filename=req.filename, model_name=req.model)
-    return {"status": "ok", "message": f"Background QA generation started using {req.model}."}
+    QA_GEN_CANCEL_EVENT.clear()  # Reset cancel event
+    JOB_STATUS["qa_gen"] = "running"
+    
+    def run_and_reset():
+        global JOB_STATUS
+        try:
+            generate_bulk_qa(
+                filename=req.filename, 
+                model_name=req.model, 
+                count=req.count,
+                cancel_event=QA_GEN_CANCEL_EVENT  # Pass cancel event
+            )
+        finally:
+            JOB_STATUS["qa_gen"] = "idle"
+    
+    background_tasks.add_task(run_and_reset)
+    return {"status": "ok", "message": f"{req.count}개 Q&A 생성 시작 (모델: {req.model})"}
+
+@app.post("/api/generate_qa/cancel")
+def cancel_qa_generation():
+    global JOB_STATUS
+    if JOB_STATUS["qa_gen"] != "running":
+        return {"status": "error", "message": "진행 중인 작업이 없습니다."}
+    QA_GEN_CANCEL_EVENT.set()  # Signal cancellation
+    JOB_STATUS["qa_gen"] = "idle"
+    print("🛑 [Cancel] Q&A generation cancel requested!")
+    return {"status": "ok", "message": "Q&A 생성이 취소되었습니다."}
 
 class EvaluationRequest(BaseModel):
     limit: int = 5
@@ -248,6 +279,53 @@ def delete_file(filename: str):
         os.remove(file_path)
         return {"status": "ok", "message": f"File {filename} deleted."}
     return {"status": "error", "message": "File not found."}
+
+@app.get("/api/file_info/{filename}")
+def get_file_info(filename: str, count: int = 10, chunk_size: int = 5000):
+    """Return PDF character count and prompt info for token estimation (chunk-based)"""
+    from langchain_community.document_loaders import PyMuPDFLoader
+    from server.pipelines.qa_gen import get_prompt_fixed_length
+    
+    file_path = os.path.join(RAW_DATA_DIR, filename)
+    if not os.path.exists(file_path):
+        return {"status": "error", "message": "File not found."}
+    
+    try:
+        loader = PyMuPDFLoader(file_path)
+        docs = loader.load()
+        full_text = "\n".join([d.page_content for d in docs])
+        
+        pdf_total_chars = len(full_text)
+        num_chunks = max(1, pdf_total_chars // chunk_size)
+        qa_per_chunk = max(1, count // num_chunks)
+        
+        # Per-chunk estimation
+        prompt_fixed_chars = get_prompt_fixed_length(qa_per_chunk)
+        per_chunk_input_chars = chunk_size + prompt_fixed_chars
+        per_chunk_input_tokens = int(per_chunk_input_chars / 3)
+        per_chunk_output_tokens = qa_per_chunk * 100
+        
+        # Total estimation (all chunks needed to reach count)
+        chunks_needed = min(num_chunks, (count // qa_per_chunk) + 1)
+        estimated_total_input_tokens = per_chunk_input_tokens * chunks_needed
+        estimated_total_output_tokens = count * 100
+        estimated_total_tokens = estimated_total_input_tokens + estimated_total_output_tokens
+        
+        return {
+            "status": "ok",
+            "filename": filename,
+            "pdf_total_chars": pdf_total_chars,
+            "num_chunks": num_chunks,
+            "chunk_size": chunk_size,
+            "qa_per_chunk": qa_per_chunk,
+            "chunks_needed": chunks_needed,
+            "prompt_fixed_chars": prompt_fixed_chars,
+            "estimated_input_tokens": estimated_total_input_tokens,
+            "estimated_output_tokens": estimated_total_output_tokens,
+            "estimated_total_tokens": estimated_total_tokens
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 # --- Basic Data Management APIs ---
 @app.get("/health")

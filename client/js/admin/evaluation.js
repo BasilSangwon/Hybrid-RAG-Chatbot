@@ -3,11 +3,13 @@
 async function generateAIQA() {
     const file = document.getElementById('qa_source_file').value;
     const modelSelect = document.getElementById('shared_model_select');
+    const countInput = document.getElementById('qa_count');
     const selectedModel = modelSelect ? modelSelect.value : "gemini-2.0-flash";
+    const count = countInput ? parseInt(countInput.value) || 10 : 10;
 
     if (!file) return alert("분석할 PDF 파일을 선택해주세요.");
 
-    if (!confirm(`'${file}' 파일을 분석하여 QA 데이터셋을 자동 생성하시겠습니까?\n(선택된 모델: ${selectedModel})`)) return;
+    if (!confirm(`'${file}' 파일에서 ${count}개의 Q&A를 생성하시겠습니까?\n(모델: ${selectedModel})`)) return;
 
     try {
         const res = await fetch(API + '/api/generate_qa', {
@@ -15,13 +17,72 @@ async function generateAIQA() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 filename: file,
-                model: selectedModel
+                model: selectedModel,
+                count: count
             })
         });
         const data = await res.json();
         alert(data.message);
     } catch (e) {
         alert("요청 실패: " + e);
+    }
+}
+
+// 파일 정보 및 토큰 예상치 업데이트 (파일/개수 변경 시)
+async function updateFileInfo() {
+    const fileSelect = document.getElementById('qa_source_file');
+    const countInput = document.getElementById('qa_count');
+    const tokenInfoDiv = document.getElementById('qa_token_info');
+
+    if (!fileSelect || !countInput || !tokenInfoDiv) return;
+
+    const filename = fileSelect.value;
+    const count = parseInt(countInput.value) || 10;
+
+    if (!filename) {
+        tokenInfoDiv.innerHTML = '💡 파일을 선택하면 예상 토큰이 표시됩니다.';
+        return;
+    }
+
+    tokenInfoDiv.innerHTML = '⏳ 파일 분석 중...';
+
+    try {
+        const res = await fetch(API + `/api/file_info/${encodeURIComponent(filename)}?count=${count}`);
+        const data = await res.json();
+
+        if (data.status === 'ok') {
+            tokenInfoDiv.innerHTML = `
+                <div style="margin-bottom:4px;">
+                    📄 <b>PDF</b>: ${data.pdf_total_chars.toLocaleString()}자 
+                    → <b>${data.num_chunks}개</b> 청크 (${data.chunk_size.toLocaleString()}자/청크)
+                </div>
+                <div style="margin-bottom:4px;">
+                    📝 <b>처리</b>: ${data.chunks_needed}개 청크 × ${data.qa_per_chunk}개 Q&A
+                </div>
+                <div style="border-top:1px solid #bae6fd; padding-top:5px; margin-top:5px;">
+                    💡 <b>예상 토큰</b>: Q&A ${count}개 ≈ <b>~${data.estimated_total_tokens.toLocaleString()} 토큰</b>
+                    <br><span style="color:#64748b; font-size:10px;">
+                        입력: ~${data.estimated_input_tokens.toLocaleString()} + 출력: ~${data.estimated_output_tokens.toLocaleString()}
+                    </span>
+                </div>
+            `;
+        } else {
+            tokenInfoDiv.innerHTML = `❌ ${data.message}`;
+        }
+    } catch (e) {
+        tokenInfoDiv.innerHTML = `❌ 파일 정보 로드 실패: ${e}`;
+    }
+}
+
+// Q&A 생성 취소
+async function cancelQAGen() {
+    if (!confirm("Q&A 생성을 취소하시겠습니까?")) return;
+    try {
+        const res = await fetch(API + '/api/generate_qa/cancel', { method: 'POST' });
+        const data = await res.json();
+        alert(data.message);
+    } catch (e) {
+        alert("취소 실패: " + e);
     }
 }
 

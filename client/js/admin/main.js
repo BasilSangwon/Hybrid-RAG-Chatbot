@@ -66,6 +66,24 @@ async function checkJobStatus() {
             }
         }
         lastGraphStatus = status.graph;
+
+        // Q&A Generation Status
+        const qaGenButtons = document.getElementById('qa_gen_buttons');
+        const qaGenProgress = document.getElementById('qa_gen_progress');
+        if (qaGenButtons && qaGenProgress) {
+            if (status.qa_gen === 'running') {
+                qaGenButtons.style.display = 'none';
+                qaGenProgress.style.display = 'block';
+            } else {
+                qaGenButtons.style.display = 'block';
+                qaGenProgress.style.display = 'none';
+                if (lastQAGenStatus === 'running') {
+                    loadAnswers();
+                    alert("Q&A 생성이 완료되었습니다!");
+                }
+            }
+        }
+        lastQAGenStatus = status.qa_gen;
     } catch (e) { }
 }
 
