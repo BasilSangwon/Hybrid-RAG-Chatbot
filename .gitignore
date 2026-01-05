@@ -72,4 +72,15 @@ pg_data/
 *.log
 *.pot
 *.pyc
-logs/
+logs/# Test and diagnostic files
+test_models.py
+diagnose_quota.py
+debug_logs/
+GITHUB_UPLOAD_CHECKLIST.md
+
+# Temporary Git documentation (internal use only)
+HOW_TO_FIX_GIT_COMMIT_MESSAGE.md
+COMMIT_MESSAGE_FIXED.md
+GIT_COMMIT_FIX_INSTRUCTIONS.md
+COMMIT_STANDARDIZATION_COMPLETE.md
+EXECUTE_COMMIT_STANDARDIZATION.md
