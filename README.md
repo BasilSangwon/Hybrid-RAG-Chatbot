@@ -84,12 +84,6 @@ docker-compose down -v
 docker-compose up -d --build
 ```
 
-### 3. Access Points
-
-- **Chat UI**: `http://localhost:8000/`
-- **Admin Dashboard**: `http://localhost:8000/admin`
-- **Neo4j Browser**: `http://localhost:7474`
-
 ## 📚 Documentation
 
 - [**Architecture Details**](docs/ARCHITECTURE.md): 시스템 설계 원칙 및 다이어그램
@@ -97,24 +91,19 @@ docker-compose up -d --build
 
 ## 💡 Usage Scenarios
 
-### 1. Ingestion (데이터 구축)
+> 📘 자세한 사용 방법은 [**사용자 가이드 (docs/USER_GUIDE.md)**](docs/USER_GUIDE.md)를 참고하세요.
+
+### Quick Start
 
 1. **Admin Dashboard** (`/admin`) 접속
-2. **Experiment 생성**:
-   - `Name`: 실험 이름 입력 (예: `exp_v1_chunk500`)
-   - `Chunk Size`: `500`
-   - `Overlap`: `50`
-   - `Model`: `gemini-1.5-pro` (권장)
-3. **Ingest Start**: 구축 버튼 클릭
-   - _Rate Limit 방지를 위해 각 배치마다 자동 대기(Auto-Wait)가 발생하며 로그에 표시됩니다._
+2. **Experiment 생성**: `Name`, `Chunk Size` 입력 및 `Ingest Start` (학습)
+3. **Chat UI** (`/`) 접속하여 대화 및 평가 진행
 
-### 2. Chat & Evaluation (대화 및 평가)
+### Access Points
 
-1. **Chat UI** (`/`) 접속
-2. **Model Selection**: 우측 상단에서 `Experiment` 및 사용할 `LLM Model` 선택
-   - 구축 시 사용한 모델과 다른 모델(예: `Flash`)을 사용하여 답변 속도를 테스트할 수 있습니다.
-3. **Question**: 질문 입력 후 하이브리드 검색 결과 확인
-   - 답변 하단에 **Vector Context**와 **Graph Context**가 각각 표시되어, 어떤 정보가 어디서 검색되었는지 검증 가능합니다.
+- **Chat UI**: `http://localhost:8000/`
+- **Admin Dashboard**: `http://localhost:8000/admin`
+- **Neo4j Browser**: `http://localhost:7474`
 
 ---
 
