@@ -21,7 +21,7 @@ AI RAG Laboratory는 **실험(Experiment) 중심의 하이브리드 RAG (Vector 
   - **Vector Search (`pgvector`)**: 질문과 의미적으로 유사한 텍스트 청크 검색 (Semantic match).
   - **Graph Search (`Neo4j`)**: 노드 간의 관계(Relationship)를 추적하여 논리적 연결 고리 파악 (Structure match).
 - **Keyword Expansion**:
-  - 단순 매칭 실패를 보완하기 위해 `Neighborhood Search` (1~2 hop) 및 `Broad Keyword Matching` 알고리즘 적용.
+  - LLM을 이용하여 사용자 질문을 Cypher Query로 변환하고, Knowledge Graph 내에서 연관된 노드 정보를 직접 조회.
 
 ### 3. Rate-Limit Resilient Pipeline (안정성)
 

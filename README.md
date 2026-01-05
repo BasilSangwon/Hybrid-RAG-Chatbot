@@ -38,7 +38,7 @@ PDF 문서를 기반으로 Vector DB(정밀 검색)와 Knowledge Graph(관계 �
 본 시스템은 **"데이터 격리(Isolation)"**와 **"검색 보완(Hybrid)"**을 핵심 설계 철학으로 함.
 
 - **Ingestion**: 모든 데이터 구축은 `Experiment ID`를 기준으로 격리되어, 파라미터 변경에 따른 성능 간섭을 원천 차단함.
-- **Retrieval**: Keyword 매칭의 한계를 극복하기 위해 `Graph Neighborhood Search`(1~2 hop)를 결합하여 답변 커버리지 극대화.
+- **Retrieval**: LangChain의 `GraphCypherQAChain`을 활용하여 자연어를 Cypher 쿼리로 변환, 구조적 정보를 조회함.
 
 ## 🗺️ Roadmap
 
@@ -94,3 +94,28 @@ docker-compose up -d --build
 
 - [**Architecture Details**](docs/ARCHITECTURE.md): 시스템 설계 원칙 및 다이어그램
 - [**Dev Log (Worklog)**](docs/WORKLOG.md): 개발 히스토리 및 트러블슈팅 기록
+
+## 💡 Usage Scenarios
+
+### 1. Ingestion (데이터 구축)
+
+1. **Admin Dashboard** (`/admin`) 접속
+2. **Experiment 생성**:
+   - `Name`: 실험 이름 입력 (예: `exp_v1_chunk500`)
+   - `Chunk Size`: `500`
+   - `Overlap`: `50`
+   - `Model`: `gemini-1.5-pro` (권장)
+3. **Ingest Start**: 구축 버튼 클릭
+   - _Rate Limit 방지를 위해 각 배치마다 자동 대기(Auto-Wait)가 발생하며 로그에 표시됩니다._
+
+### 2. Chat & Evaluation (대화 및 평가)
+
+1. **Chat UI** (`/`) 접속
+2. **Model Selection**: 우측 상단에서 `Experiment` 및 사용할 `LLM Model` 선택
+   - 구축 시 사용한 모델과 다른 모델(예: `Flash`)을 사용하여 답변 속도를 테스트할 수 있습니다.
+3. **Question**: 질문 입력 후 하이브리드 검색 결과 확인
+   - 답변 하단에 **Vector Context**와 **Graph Context**가 각각 표시되어, 어떤 정보가 어디서 검색되었는지 검증 가능합니다.
+
+---
+
+**GitHub Repository**: [https://github.com/basileus1119/AIChatbotGraph](https://github.com/basileus1119/AIChatbotGraph) (예정)
