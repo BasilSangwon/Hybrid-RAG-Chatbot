@@ -13,7 +13,7 @@ PDF 문서를 기반으로 Vector DB(정밀 검색)와 Knowledge Graph(관계 �
 - **Robust Ingestion Pipeline**:
   - **Smart Rate Limiting**: Google Gemini 무료 티어(RPM) 고려, 배치 작업 간 자동 대기(Intelligent Wait) 로직 적용.
   - **Constraint-Aware Schema**: 문서 내 '유의사항'이나 '제약조건'을 놓치지 않도록 강제된 Graph 스키마 적용.
-- **Dynamic Model Switching**: 서버 재시작 없이 Chat Session 도중 모델(Gemini Flash/Pro) 즉시 교체 가능.
+- **Dynamic Model Switching**: 서버 재시작 없이 Chat Session 도중 모델(Gemini 2.5 Flash) 즉시 교체 가능.
 - **Admin Dashboard**: PDF 업로드, 실험 데이터 시각화, 지식 베이스 관리(CRUD) UI 제공.
 
 ## 📂 Project Structure
@@ -42,17 +42,18 @@ PDF 문서를 기반으로 Vector DB(정밀 검색)와 Knowledge Graph(관계 �
 
 ## 🗺️ Roadmap
 
-### Phase 1: Stabilization (Completed) ✅
+### Phase 1: Foundation & Key Features (Completed) ✅
 
-- [x] **Infrastructure**: Docker Compose 기반 서비스 오케스트레이션 구축
-- [x] **Core Pipeline**: Hybrid RAG (Vector + Graph) Ingestion 구현
-- [x] **Management**: 실험(Experiment) CRUD 및 데이터 격리 구조 설계
+- ✅ **Infrastructure**: Docker Compose 기반 서비스 오케스트레이션 구축
+- ✅ **Core Pipeline**: Hybrid RAG (Vector + Graph) Ingestion 구현
+- ✅ **Management**: 실험(Experiment) CRUD 및 데이터 격리 구조 설계
+- ✅ **Auto-Evaluation**: RAGAS 프레임워크 도입, Ground Truth 기반 답변 품질(Recall/Precision) 자동 채점
+- ✅ **Query Optimization**: 사용자 질문 의도 분류(Intent Classification)에 따른 Search Strategy 최적화
 
-### Phase 2: Advanced Retrieval (Current) 🚧
+### Phase 2: Multi-Modal & On-Premise (Current) 🚧
 
-- [ ] **Multi-Modal Ingestion**: PDF 내 이미지/차트/도표 추출 및 Graph 노드화 (Unstructured / LlamaIndex 활용)
-- [ ] **Auto-Evaluation**: RAGAS 프레임워크 도입, Ground Truth 기반 답변 품질(Precision/Recall) 자동 채점
-- [ ] **Query Optimization**: 사용자 질문 의도 분류(Intent Classification)에 따른 Search Strategy 동적 최적화
+- [ ] **Vision-based PDF Parsing**: `Qwen/Qwen3-VL-30B-A3B-Instruct`로 PDF 내 이미지/표/차트 인식 및 Markdown 변환 (진행 중)
+- [ ] **Local LLM Deployment**: `Qwen3` 온프레미스 배포 (vLLM/Ollama) - Graph Extraction 및 Chat API를 Google Gemini에서 로컬 모델로 전환
 
 ### Phase 3: Expansion (Planned) 📅
 

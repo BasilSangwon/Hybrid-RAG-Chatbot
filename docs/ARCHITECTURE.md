@@ -33,10 +33,10 @@ AI RAG Laboratory는 **실험(Experiment) 중심의 하이브리드 RAG (Vector 
 graph TD
     subgraph "Data Ingestion Pipeline"
         PDF[PDF Documents] --> |Text Extraction| Chunker[Chunker]
-        Chunker --> |Feature Extraction| LLM[LLM (Gemini 1.5 Pro)]
+        Chunker --> |Feature Extraction| LLM["LLM (Gemini 2.5 Flash)"]
 
         LLM --> |Vectorize| Embed[Embedding Model]
-        Embed --> |Save| PG[PostgreSQL (pgvector)]
+        Embed --> |Save| PG["PostgreSQL (pgvector)"]
 
         LLM --> |Graph Extraction| GraphTransformer[Graph Transformer]
         GraphTransformer --> |Constraint/Requirement| Neo4j[Neo4j Graph DB]
@@ -56,7 +56,7 @@ graph TD
         PG --> |Context A| Augment[Context Augmentation]
         Neo4j --> |Context B| Augment
 
-        Augment --> |Prompt| Generator[LLM (Gemini Flash/Pro)]
+        Augment --> |Prompt| Generator["LLM (Gemini 2.5 Flash)"]
         Generator --> Response[Final Answer]
     end
 ```

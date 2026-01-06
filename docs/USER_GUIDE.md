@@ -21,7 +21,7 @@
 2. **Experiment 설정**:
    - `Chunk Size`: 문서 조각 크기 (보통 500~1000 권장)
    - `Overlap`: 조각 간 중복 구간 (보통 50~100)
-   - `Model`: 추출에 사용할 LLM 선택 (`gemini-1.5-pro` 권장)
+   - `Model`: 추출에 사용할 LLM 선택 (`gemini-2.5-flash` 권장)
 3. **학습 시작**:
    - `⚡ Vector DB`: 단순 검색용 인덱스 생성
    - `🕸️ Graph DB`: 지식 그래프 구축 (오래 걸릴 수 있음, 자동 대기 기능 작동)
