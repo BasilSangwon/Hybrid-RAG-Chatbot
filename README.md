@@ -108,4 +108,4 @@ docker-compose up -d --build
 
 ---
 
-**GitHub Repository**: [https://github.com/basileus1119/AIChatbotGraph](https://github.com/basileus1119/AIChatbotGraph) (예정)
+**GitHub Repository**: [https://github.com/BasilSangwon/Hybrid-RAG-Chatbot](https://github.com/BasilSangwon/Hybrid-RAG-Chatbot)

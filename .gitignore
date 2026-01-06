@@ -54,7 +54,7 @@ manual_bot/
 Thumbs.db
 
 # ------------------------------------------------
-# 5. RAG Project Data & Vector DB
+# 5. RAG Project Data & Vector DB (Excluded for Portfolio)
 # ------------------------------------------------
 data/raw/*
 !data/raw/.gitkeep
@@ -63,15 +63,22 @@ data/processed/*
 data/vector_db/
 *.sqlite3
 chroma/
-# [추가됨] Docker PostgreSQL 데이터 저장소 (절대 업로드 금지)
 pg_data/
+db/
 
 # ------------------------------------------------
-# 6. Logs & Temp Files
+# 6. Logs, Environments & Temp Files
 # ------------------------------------------------
 *.log
 *.pot
 *.pyc
+env/
+venv/
+.env
+.env.*
+logs/
+debug_logs/
+
 logs/# Test and diagnostic files
 test_models.py
 diagnose_quota.py
